@@ -6,6 +6,8 @@ import im.cave.ms.client.multiplayer.party.Party;
 import im.cave.ms.configs.Config;
 import im.cave.ms.configs.WorldConfig;
 import im.cave.ms.connection.db.DataBaseManager;
+import im.cave.ms.connection.server.AbstractServer;
+import im.cave.ms.connection.server.auction.Auction;
 import im.cave.ms.connection.server.cashshop.CashShopServer;
 import im.cave.ms.connection.server.channel.MapleChannel;
 import im.cave.ms.tools.StringUtil;
@@ -33,7 +35,8 @@ public class World {
     private final Map<Integer, Guild> guilds = new HashMap<>(); //家族
 
     private Integer partyCounter = 1;
-    private CashShopServer cashShopServer;
+    private CashShopServer cashShopServer; //商城
+    private Auction auction; //拍卖行
     private String eventMessage;
 
     public World(int id, String eventMessage) {
@@ -90,6 +93,7 @@ public class World {
                 channels.add(channel);
             }
             cashShopServer = new CashShopServer(id);
+            auction = new Auction(id);
         } catch (Exception e) {
             e.printStackTrace();
             return false;
@@ -109,7 +113,7 @@ public class World {
         getGuilds().put(guild.getId(), guild);
     }
 
-    private Map<Integer, Guild> getGuilds() {
+    public Map<Integer, Guild> getGuilds() {
         return guilds;
     }
 
@@ -183,5 +187,9 @@ public class World {
         }
         Guild guild = Util.findWithPred(guilds.values(), g -> g.getName().equalsIgnoreCase(name));
         return guild == null;
+    }
+
+    public Auction getAuction() {
+        return auction;
     }
 }

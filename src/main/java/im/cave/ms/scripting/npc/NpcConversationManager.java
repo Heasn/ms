@@ -1,16 +1,13 @@
 package im.cave.ms.scripting.npc;
 
 import im.cave.ms.client.MapleClient;
-import im.cave.ms.client.character.MapleCharacter;
 import im.cave.ms.connection.packet.NpcPacket;
 import im.cave.ms.connection.packet.WorldPacket;
 import im.cave.ms.connection.packet.result.ExpressResult;
 import im.cave.ms.connection.packet.result.GuildResult;
-import im.cave.ms.enums.JobEnum;
 import im.cave.ms.enums.NpcMessageType;
 import im.cave.ms.scripting.AbstractPlayerInteraction;
 
-import java.util.List;
 import java.util.Map;
 
 import static im.cave.ms.enums.NpcMessageType.AskAccept;
@@ -120,7 +117,6 @@ public class NpcConversationManager extends AbstractPlayerInteraction {
         nsm.dispose(getClient());
     }
 
-
     public void resetParam() {
         getNpcScriptInfo().resetParam();
     }
@@ -225,4 +221,5 @@ public class NpcConversationManager extends AbstractPlayerInteraction {
     public void inputGuildName() {
         c.announce(WorldPacket.guildResult(GuildResult.inputGuildName()));
     }
+
 }

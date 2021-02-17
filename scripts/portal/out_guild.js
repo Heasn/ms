@@ -1,12 +1,14 @@
-const RecordType = Java.type("im.cave.ms.enums.RecordType");
-const map = 910001000;
+const map = 200000301;
+const npc_Leia = 2010011;
 
 function enter(pm) {
     const returnMap = pm.getRecordValue("RETURN_MAP", map);
     if (returnMap > 0) {
-        pm.warp(returnMap, "profession");
+        let sp = pm.findSPNearNpc(returnMap, npc_Leia);
+        pm.warp(returnMap, sp);
         return true;
     } else {
+        pm.warp(100000000, 0);//回射手咯
         pm.getChar().enableAction();
         return false;
     }

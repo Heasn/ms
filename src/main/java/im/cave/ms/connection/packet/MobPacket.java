@@ -9,6 +9,7 @@ import im.cave.ms.connection.netty.OutPacket;
 import im.cave.ms.connection.packet.opcode.SendOpcode;
 import im.cave.ms.enums.RemoveMobType;
 import im.cave.ms.tools.Position;
+import im.cave.ms.tools.Rect;
 
 
 /**
@@ -48,6 +49,7 @@ public class MobPacket {
 
     public static OutPacket mobCtrlAck(int objId, int moveId, boolean useSkill, int currentMp, int skillId, short skillLevel) {
         OutPacket out = new OutPacket(SendOpcode.MOB_CONTROL_ACK);
+
         out.writeInt(objId);
         out.writeShort(moveId);
         out.writeBool(useSkill);
@@ -56,6 +58,7 @@ public class MobPacket {
         out.writeShort(skillLevel);
         out.writeInt(0);
         out.writeInt(0);
+
         return out;
     }
 
@@ -67,6 +70,22 @@ public class MobPacket {
         return out;
     }
 
+    public static OutPacket mobSkillDelay(int mobId, int skillAfter, int skillId, int slv, int sequenceDelay, Rect rect) {
+        OutPacket out = new OutPacket(SendOpcode.MOB_SKILL_DELAY);
+
+        out.writeInt(mobId);
+        out.writeInt(skillAfter);
+        out.writeInt(skillId);
+        out.writeInt(slv);
+        out.writeInt(sequenceDelay);
+        if (rect != null) {
+            out.writeRect(rect);
+        } else {
+            out.write(new byte[8]); // (0,0),(0,0)
+        }
+
+        return out;
+    }
 
     public static OutPacket removeMob(int objectId, RemoveMobType type) {
         OutPacket out = new OutPacket(SendOpcode.REMOVE_MOB);
@@ -78,6 +97,7 @@ public class MobPacket {
 
     public static OutPacket changeMobController(Mob mob, boolean hasBeenInit, boolean isController) {
         OutPacket out = new OutPacket(SendOpcode.MOB_CHANGE_CONTROLLER);
+
         out.writeBool(isController);
         out.writeInt(mob.getObjectId());
         if (isController) {
@@ -97,11 +117,13 @@ public class MobPacket {
                 mob.encodeInit(out);
             }
         }
+
         return out;
     }
 
     public static OutPacket moveMobRemote(Mob mob, MobSkillAttackInfo msai, MovementInfo movementInfo) {
         OutPacket out = new OutPacket(SendOpcode.MOB_MOVE);
+
         out.writeInt(mob.getObjectId());
         out.write(msai.actionAndDirMask);
         out.write(msai.action);
@@ -113,6 +135,7 @@ public class MobPacket {
         }
         movementInfo.encode(out);
         out.write(0);
+
         return out;
     }
 

@@ -15,12 +15,17 @@ import im.cave.ms.connection.server.channel.handler.PetHandler;
 import im.cave.ms.connection.server.channel.handler.QuestHandler;
 import im.cave.ms.connection.server.channel.handler.UserHandler;
 import im.cave.ms.connection.server.channel.handler.WorldHandler;
-import im.cave.ms.connection.server.service.EventManager;
 import im.cave.ms.enums.LoginStatus;
 import im.cave.ms.enums.ServerType;
 import io.netty.channel.ChannelHandlerContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionHandler;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import static im.cave.ms.client.MapleClient.CLIENT_KEY;
 
@@ -31,6 +36,9 @@ import static im.cave.ms.client.MapleClient.CLIENT_KEY;
  * @date 11/19 19:40
  */
 public class ChannelHandler extends AbstractServerHandler {
+    private final static ExecutorService
+            workerThreadService = newBlockingExecutorsUseCallerRun(Runtime.getRuntime().availableProcessors() * 2);
+
     private static final Logger log = LoggerFactory.getLogger("Channel");
     private final int channel;
     private final int world;
@@ -96,7 +104,10 @@ public class ChannelHandler extends AbstractServerHandler {
                 UserHandler.handleUserEnterPortalSpecialRequest(in, c);
                 break;
             case USER_QUEST_REQUEST:
-                EventManager.addEvent(() -> QuestHandler.handleQuestRequest(in, c), 0);
+                QuestHandler.handleQuestRequest(in, c);
+                break;
+            case USER_THROW_GRENADE:
+                UserHandler.handleUserThrowGrenade(in, c);
                 break;
             case USER_MACRO_SYS_DATA_MODIFIED:
                 UserHandler.handleUserMacroSysDataModified(in, c);
@@ -124,6 +135,9 @@ public class ChannelHandler extends AbstractServerHandler {
                 break;
             case MOB_MOVE:
                 MobHandler.handleMobMove(in, c);
+                break;
+            case MOB_SKILL_DELAY_END:
+                MobHandler.handleMobSkillDelayEnd(in, c);
                 break;
             case NPC_ANIMATION:
                 NpcHandler.handleNpcAnimation(in, c);
@@ -185,6 +199,9 @@ public class ChannelHandler extends AbstractServerHandler {
             case USER_ITEM_OPTION_UPGRADE_ITEM_USE_REQUEST:
                 InventoryHandler.handleUserItemOptionUpgradeItemUseRequest(in, c);
                 break;
+            case USER_ITEM_SKILL_OPTION_UPGRADE_ITEM_USE_REQUEST:
+                InventoryHandler.handleUserItemSkillOptionUpgradeItemUseRequest(in, c);
+                break;
             case USER_ABILITY_UP_REQUEST:
                 UserHandler.handleAPUpdateRequest(in, c);
                 break;
@@ -195,7 +212,8 @@ public class ChannelHandler extends AbstractServerHandler {
                 UserHandler.handleUserDamageSkinSaveRequest(in, c);
                 break;
             case USER_SELECT_NPC:
-                NpcHandler.handleUserSelectNPC(in, c);
+                workerThreadService.execute(() -> NpcHandler.handleUserSelectNPC(in, c));
+//                NpcHandler.handleUserSelectNPC(in, c);
                 break;
             case USER_SCRIPT_MESSAGE_ANSWER:
                 NpcHandler.handleUserScriptMessageAnswer(in, c);
@@ -209,6 +227,9 @@ public class ChannelHandler extends AbstractServerHandler {
             case EXPRESS_REQUEST:
                 WorldHandler.handleMapleExpressRequest(in, c);
                 break;
+            case AUCTION:
+                WorldHandler.handleAuctionRequest(in, c);
+                break;
             case CHAR_HIT:
                 UserHandler.handleHit(in, c);
                 break;
@@ -217,6 +238,9 @@ public class ChannelHandler extends AbstractServerHandler {
                 break;
             case MIGRATE_TO_CASH_SHOP_REQUEST:
                 WorldHandler.handleMigrateToCashShopRequest(in, c);
+                break;
+            case MIGRATE_TO_AUCTION_REQUEST:
+                WorldHandler.handleMigrateToAuctionRequest(in, c);
                 break;
             case CLOSE_RANGE_ATTACK:
             case RANGED_ATTACK:
@@ -319,6 +343,9 @@ public class ChannelHandler extends AbstractServerHandler {
             case GUILD_REQUEST:
                 WorldHandler.handleGuildRequest(in, c);
                 break;
+            case GUILD_RANK:
+                WorldHandler.handleGuildRankRequest(c);
+                break;
             case SYSTEM_OPTION:
                 UserHandler.handleUserSystemOptionRequest(in, c);
                 break;
@@ -405,4 +432,14 @@ public class ChannelHandler extends AbstractServerHandler {
 
     }
 
+
+    private static ExecutorService newBlockingExecutorsUseCallerRun(int size) {
+        return new ThreadPoolExecutor(size, size, 0L, TimeUnit.MILLISECONDS, new SynchronousQueue<>(), (r, executor) -> {
+            try {
+                executor.getQueue().put(r);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
 }

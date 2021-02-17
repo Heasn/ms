@@ -1,6 +1,7 @@
 package im.cave.ms.connection.packet;
 
 import im.cave.ms.client.Account;
+import im.cave.ms.client.MapleClient;
 import im.cave.ms.client.OnlineReward;
 import im.cave.ms.client.character.ExpIncreaseInfo;
 import im.cave.ms.client.character.MapleCharacter;
@@ -12,16 +13,19 @@ import im.cave.ms.client.field.FieldEffect;
 import im.cave.ms.client.field.MapleMap;
 import im.cave.ms.client.field.QuickMoveInfo;
 import im.cave.ms.client.field.obj.Drop;
+import im.cave.ms.client.field.obj.Pet;
 import im.cave.ms.client.multiplayer.Express;
 import im.cave.ms.client.multiplayer.friend.Friend;
 import im.cave.ms.client.multiplayer.guilds.Guild;
 import im.cave.ms.client.multiplayer.party.PartyResult;
 import im.cave.ms.client.storage.Trunk;
+import im.cave.ms.connection.netty.InPacket;
 import im.cave.ms.connection.netty.OutPacket;
 import im.cave.ms.connection.packet.opcode.SendOpcode;
 import im.cave.ms.connection.packet.result.ExpressResult;
 import im.cave.ms.connection.packet.result.GuildResult;
 import im.cave.ms.connection.packet.result.OnlineRewardResult;
+import im.cave.ms.connection.server.world.World;
 import im.cave.ms.constants.GameConstants;
 import im.cave.ms.enums.ChatType;
 import im.cave.ms.enums.DimensionalMirror;
@@ -37,9 +41,12 @@ import im.cave.ms.tools.Position;
 import im.cave.ms.tools.Randomizer;
 import im.cave.ms.tools.StringUtil;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static im.cave.ms.constants.ServerConstants.NEXON_IP;
 import static im.cave.ms.constants.ServerConstants.ZERO_TIME;
@@ -292,9 +299,10 @@ public class WorldPacket {
     }
 
     public static OutPacket serverNotice(String content) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.SERVER_NOTICE.getValue());
+        OutPacket out = new OutPacket(SendOpcode.SERVER_NOTICE);
+
         out.writeMapleAsciiString(content);
+
         return out;
     }
 
@@ -575,32 +583,53 @@ public class WorldPacket {
         out.writeInt(chr.getId());
         out.writeInt(chr.getLevel());
         out.writeMapleAsciiString(chr.getName());
-        out.writeZeroBytes(22);   //todo
+        out.writeMapleAsciiString("");
+        if (chr.getGuild() != null) {
+            chr.getGuild().encodeForRemote(out);
+        } else {
+            Guild.defaultEncodeForRemote(out);
+        }
+        out.writeZeroBytes(8);   //可能和家族相关
         out.write(chr.getGender());
-        out.writeZeroBytes(17); //todo
+        out.writeInt(chr.getFame());
+        out.writeZeroBytes(13); //todo
         Map<CharacterTemporaryStat, List<Option>> spawnBuffs = CharacterTemporaryStat.getSpawnBuffs();
         spawnBuffs.putAll(tsm.getCurrentStats());
         tsm.encodeForRemote(out, spawnBuffs);
         out.writeShort(chr.getJob());
         out.writeShort(chr.getSubJob());
-        out.writeInt(chr.getTotalChuc());
+        out.writeInt(chr.getTotalChuc()); //星之力
         out.writeInt(0);
         chr.getCharLook().encode(out);
         out.writeInt(0); // int or short
         out.write(0xFF);
         out.writeInt(0);
         out.write(0xFF);
-        out.writeInt(0);
-        out.writeZeroBytes(70);
+        out.writeZeroBytes(32);
+//        out.writeInt(chr.getActiveEffectItemID());
+//        out.writeInt(chr.getMonkeyEffectItemID());
+        out.writeInt(chr.getActiveNickItemId());
+        out.write(0);
+        out.writeInt(chr.getDamageSkin().getDamageSkinID());
+        out.writeZeroBytes(33);
         for (int i = 0; i < 6; i++) {
             out.write(-1); // unk
         }
-        //椅子
-        out.writeZeroBytes(14);
+        out.writeZeroBytes(14); //椅子
         out.writePosition(chr.getPosition());
         out.write(chr.getMoveAction());
         out.writeShort(chr.getFoothold());
-        out.writeZeroBytes(3); //unk
+        out.write(0);
+        for (Pet pet : chr.getPets()) {
+            if (pet.getId() == 0) {
+                continue;
+            }
+            out.write(1);
+            out.writeInt(pet.getIdx());
+            pet.encode(out);
+        }
+        out.write(0);
+        out.write(0);
         out.write(1);
         out.writeZeroBytes(28);
         for (int i = 0; i < 5; i++) {
@@ -616,7 +645,8 @@ public class WorldPacket {
         out.writeInt(1051291);
         out.writeZeroBytes(29);
         out.writeMapleAsciiString(chr.getWorld() + "-" + StringUtil.getLeftPaddedStr(String.valueOf(chr.getId()), '0', 6));
-        out.writeInt(0);
+        out.writeInt(0); // 如果是5 则有怪怪  应该是MASK
+
         return out;
     }
 
@@ -910,6 +940,37 @@ public class WorldPacket {
         OutPacket out = new OutPacket(SendOpcode.GUILD_RESULT);
 
         gri.encode(out);
+
+        return out;
+    }
+
+    public static OutPacket guildRank(List<Guild> ggpWeaklyRank, List<Guild> captureTheFlagGameRank, List<Guild> undergroundWaterwayRank) {
+        OutPacket out = new OutPacket(SendOpcode.GUILD_RANK);
+
+        out.writeBool(true);
+        out.writeInt(ggpWeaklyRank.size());
+        for (Guild guild : ggpWeaklyRank) {
+            out.writeInt(guild.getId());
+            out.writeInt(guild.getGgp());
+            out.writeLong(DateUtil.getFileTime(System.currentTimeMillis())); //可能是GGP最后更新时间
+            out.writeMapleAsciiString(guild.getName());
+        }
+
+        out.writeInt(captureTheFlagGameRank.size());
+        for (Guild guild : captureTheFlagGameRank) {
+            out.writeInt(guild.getId());
+            out.writeInt(guild.getGgp()); //todo 这里应该变一下
+            out.writeLong(DateUtil.getFileTime(System.currentTimeMillis()));
+            out.writeMapleAsciiString(guild.getName());
+        }
+
+        out.writeInt(undergroundWaterwayRank.size());
+        for (Guild guild : undergroundWaterwayRank) {
+            out.writeInt(guild.getId());
+            out.writeInt(guild.getGgp()); //todo 这里应该变一下
+            out.writeLong(DateUtil.getFileTime(System.currentTimeMillis()));
+            out.writeMapleAsciiString(guild.getName());
+        }
 
         return out;
     }

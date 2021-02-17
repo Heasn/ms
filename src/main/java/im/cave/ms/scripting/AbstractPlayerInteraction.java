@@ -7,14 +7,17 @@ import im.cave.ms.client.RecordManager;
 import im.cave.ms.client.character.MapleCharacter;
 import im.cave.ms.client.field.MapleMap;
 import im.cave.ms.client.field.Portal;
+import im.cave.ms.client.field.obj.npc.Npc;
 import im.cave.ms.connection.packet.WorldPacket;
 import im.cave.ms.constants.JobConstants;
 import im.cave.ms.enums.ChatType;
-import im.cave.ms.enums.JobEnum;
+import im.cave.ms.enums.JobType;
 import im.cave.ms.enums.RecordType;
+import im.cave.ms.scripting.npc.NpcScriptManager;
 
 import java.util.Calendar;
 import java.util.List;
+import java.util.Set;
 
 public class AbstractPlayerInteraction {
 
@@ -29,7 +32,7 @@ public class AbstractPlayerInteraction {
     }
 
     public MapleCharacter getChar() {
-        return getChar();
+        return c.getPlayer();
     }
 
     public int getJob() {
@@ -84,15 +87,16 @@ public class AbstractPlayerInteraction {
         player.changeMap(mapId, portal != null ? portal.getId() : 0);
     }
 
+    public void warp(int mapId, int portal) {
+        getChar().changeMap(mapId, (byte) portal);
+    }
+
     public int getMapId() {
         return getChar().getMapId();
     }
 
-    public void updateRecord(String typeStr, int key, int value) throws ScriptException {
-        RecordType type = RecordType.getByName(typeStr);
-        if (type == null) {
-            throw new ScriptException("记录类型名称错误.");
-        }
+
+    public void updateRecord(RecordType type, int key, int value) {
         RecordManager recordManager = getChar().getRecordManager();
         Record record = recordManager.getRecord(type, key);
         if (record == null) {
@@ -107,6 +111,14 @@ public class AbstractPlayerInteraction {
             record.setValue(value);
         }
         recordManager.addRecord(record);
+    }
+
+    public void updateRecord(String typeStr, int key, int value) throws ScriptException {
+        RecordType type = RecordType.getByName(typeStr);
+        if (type == null) {
+            throw new ScriptException("记录类型名称错误.");
+        }
+        updateRecord(type, key, value);
     }
 
     public int getRecordValue(String typeStr, int key) throws ScriptException {
@@ -125,8 +137,8 @@ public class AbstractPlayerInteraction {
         player.setCombo(player.getCombo() + 1);
     }
 
-    public List<JobEnum> getAdvancedJobs(int jobId) {
-        return JobEnum.getAdvancedJobs(jobId);
+    public Set<JobType> getAdvancedJobs(int jobId) {
+        return JobType.getAdvancedJobs(jobId);
     }
 
     public int getJobReqLev(int jobId) {
@@ -135,5 +147,19 @@ public class AbstractPlayerInteraction {
 
     public boolean changeJob(int jobId) {
         return getChar().changeJob(jobId);
+    }
+
+    public int findSPNearNpc(int mapId, int npcId) {
+        MapleMap map = getChar().getMapleChannel().getMap(mapId);
+        Npc npc = map.getNpcById(npcId);
+        Portal portal = null;
+        if (npc != null) {
+            portal = map.getSpawnPortalNearby(npc.getPosition());
+        }
+        return portal != null ? portal.getId() : 0;
+    }
+
+    public void runNPCScript(String script, int npcID) {
+        NpcScriptManager.getInstance().start(c, npcID, script);
     }
 }

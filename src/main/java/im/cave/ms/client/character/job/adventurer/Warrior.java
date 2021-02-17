@@ -15,7 +15,7 @@ import im.cave.ms.connection.packet.UserPacket;
 import im.cave.ms.connection.packet.UserRemote;
 import im.cave.ms.constants.JobConstants;
 import im.cave.ms.enums.AssistType;
-import im.cave.ms.enums.JobEnum;
+import im.cave.ms.enums.JobType;
 import im.cave.ms.enums.MoveAbility;
 import im.cave.ms.enums.SkillStat;
 import im.cave.ms.provider.data.SkillData;
@@ -23,7 +23,9 @@ import im.cave.ms.provider.info.SkillInfo;
 import im.cave.ms.tools.Util;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static im.cave.ms.client.character.temp.CharacterTemporaryStat.*;
@@ -199,15 +201,15 @@ public class Warrior extends Beginner {
         if (chr != null) {
             short jobId = chr.getJob();
             if (JobConstants.isHero(jobId)) {
-                JobEnum job = JobEnum.getJobById(jobId);
-                if (job.isAdvancedJobOf(JobEnum.FIGHTER)) {
+                JobType job = JobType.getJobById(jobId);
+                if (job.isAdvancedJobOf(JobType.FIGHTER)) {
                     if (!chr.hasSkill(HERO_COMBO_ATTACK)) {
                         Skill skill = SkillData.getSkill(HERO_COMBO_ATTACK);
                         Objects.requireNonNull(skill).setCurrentLevel(1);
                         chr.addSkill(skill);
                     }
                 }
-                if (job.isAdvancedJobOf(JobEnum.CRUSADER)) {
+                if (job.isAdvancedJobOf(JobType.CRUSADER)) {
                     if (!chr.hasSkill(HERO_UPWARD_CHARGE)) {
                         Skill skill = SkillData.getSkill(HERO_UPWARD_CHARGE);
                         Objects.requireNonNull(skill).setCurrentLevel(1);
@@ -239,7 +241,7 @@ public class Warrior extends Beginner {
         MapleCharacter player = c.getPlayer();
         TemporaryStatManager tsm = player.getTemporaryStatManager();
         Skill skill = player.getSkill(attackInfo.skillId);
-        SkillInfo si = null;
+        SkillInfo si;
         if (skill != null) {
             si = SkillData.getSkillInfo(attackInfo.skillId);
         } else {
@@ -642,5 +644,13 @@ public class Warrior extends Beginner {
             tsm.sendSetStatPacket();
         }
 
+    }
+
+
+    @Override
+    public boolean isHandlerOfJob(short id) {
+        Set<JobType> jobs = JobType.getAllAdvancedJobs(JobType.WARRIOR.getJob());
+        JobType job = JobType.getJobById(id);
+        return job == JobType.WARRIOR || jobs.contains(job);
     }
 }

@@ -94,7 +94,8 @@ public class NpcHandler {
             }
         }
         String finalScript = script;
-        EventManager.addEvent(() -> NpcScriptManager.getInstance().start(chr.getClient(), npcId, finalScript), 0);
+        NpcScriptManager.getInstance().start(chr.getClient(), npcId, script);
+//        EventManager.addEvent(() -> NpcScriptManager.getInstance().start(chr.getClient(), npcId, finalScript), 0);
     }
 
     public static void handleUserScriptMessageAnswer(InPacket in, MapleClient c) {
@@ -154,8 +155,6 @@ public class NpcHandler {
 
     public static void handleNpcAnimation(InPacket in, MapleClient c) {
         MapleCharacter player = c.getPlayer();
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.NPC_ANIMATION.getValue());
         int objectID = in.readInt();
         byte oneTimeAction = in.readByte();
         byte chatIdx = in.readByte();
