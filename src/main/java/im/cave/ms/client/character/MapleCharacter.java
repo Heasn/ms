@@ -8,10 +8,12 @@ import im.cave.ms.client.RecordManager;
 import im.cave.ms.client.character.items.Equip;
 import im.cave.ms.client.character.items.Inventory;
 import im.cave.ms.client.character.items.Item;
+import im.cave.ms.client.character.items.PetItem;
 import im.cave.ms.client.character.items.PotionPot;
 import im.cave.ms.client.character.items.WishedItem;
 import im.cave.ms.client.character.job.JobManager;
 import im.cave.ms.client.character.job.MapleJob;
+import im.cave.ms.client.character.job.adventurer.Beginner;
 import im.cave.ms.client.character.job.adventurer.Warrior;
 import im.cave.ms.client.character.potential.CharacterPotential;
 import im.cave.ms.client.character.potential.CharacterPotentialMan;
@@ -25,6 +27,7 @@ import im.cave.ms.client.field.obj.Drop;
 import im.cave.ms.client.field.obj.Familiar;
 import im.cave.ms.client.field.obj.MapleMapObj;
 import im.cave.ms.client.field.obj.Pet;
+import im.cave.ms.client.field.obj.Summon;
 import im.cave.ms.client.field.obj.npc.Npc;
 import im.cave.ms.client.field.obj.npc.shop.NpcShop;
 import im.cave.ms.client.field.obj.npc.shop.NpcShopItem;
@@ -42,6 +45,8 @@ import im.cave.ms.connection.db.DataBaseManager;
 import im.cave.ms.connection.db.InlinedIntArrayConverter;
 import im.cave.ms.connection.netty.OutPacket;
 import im.cave.ms.connection.netty.Packet;
+import im.cave.ms.connection.packet.CashShopPacket;
+import im.cave.ms.connection.packet.PetPacket;
 import im.cave.ms.connection.packet.UserPacket;
 import im.cave.ms.connection.packet.UserRemote;
 import im.cave.ms.connection.packet.WorldPacket;
@@ -62,6 +67,7 @@ import im.cave.ms.enums.EquipSpecialAttribute;
 import im.cave.ms.enums.InventoryOperationType;
 import im.cave.ms.enums.InventoryType;
 import im.cave.ms.enums.MapTransferType;
+import im.cave.ms.enums.MoveAbility;
 import im.cave.ms.enums.SkillStat;
 import im.cave.ms.enums.SpecStat;
 import im.cave.ms.enums.MessageType;
@@ -362,6 +368,10 @@ public class MapleCharacter implements Serializable {
     private Familiar familiar; //当前召唤的怪怪
     @Transient
     private int activeNickItemId; //激活的称号ID
+    @Transient
+    private boolean battleRecordOn; //是否开启战斗分析
+    @Transient
+    private DamageCalc damageCalc;
 
     public MapleCharacter() {
         temporaryStatManager = new TemporaryStatManager(this);
@@ -728,6 +738,10 @@ public class MapleCharacter implements Serializable {
                 setAndroid(android);
             }
         }
+        if (item.getItemId() == ItemConstants.ARES_BLESSING_RING) {
+            Summon summon = Summon.getSummonBy(this, Beginner.ARES_BLESSING, (byte) 1);
+            getMap().spawnSummon(summon);
+        }
         return true;
     }
 
@@ -1073,17 +1087,12 @@ public class MapleCharacter implements Serializable {
 
     public void addSpToJobByCurrentLevel(int amount) {
         byte jobLevel = (byte) JobConstants.getJobLevelByCharLevel(getJob(), getLevel());
-        addSp(amount, jobLevel);
+        addSp(amount, jobLevel - 1);
     }
 
     public void addSp(int amount, int jobLevel) {
-        List<Integer> remainingSp = getRemainingSp();
-        if (jobLevel == 0) {  //新手没有技能点
-            return;
-        }
-        remainingSp.set(jobLevel, remainingSp.get(jobLevel - 1) + amount);
+        getStats().addRemainingSp(amount, jobLevel);
     }
-
 
     public boolean setJob(int jobId) {
         JobType job = JobType.getJobById((short) jobId);
@@ -1131,7 +1140,7 @@ public class MapleCharacter implements Serializable {
                 enableAction();
                 return;
             }
-            changeMap(map, getSpawnPoint(), false);
+            changeMap(map, portal, false);
         }
     }
 
@@ -1150,6 +1159,7 @@ public class MapleCharacter implements Serializable {
             announce(WorldPacket.getWarpToMap(this, map, portal));
         }
         map.addPlayer(this);
+        initPets();
         map.sendMapObjectPackets(this);
         map.broadcastMessage(UserRemote.hiddenEffectEquips(this));
         map.broadcastMessage(UserRemote.setSoulEffect(this));
@@ -1158,10 +1168,23 @@ public class MapleCharacter implements Serializable {
             announce(WorldPacket.partyResult(PartyResult.loadParty(getParty())));
         }
     }
+
     /*
         地图切换 结束
      */
 
+    private void initPets() {
+        for (PetItem petItem : getCashInventory().getItems().stream().filter(i -> i instanceof PetItem && ((PetItem) i).getActiveState() > 0)
+                .map(i -> ((PetItem) i)).collect(Collectors.toList())) {
+            Pet p = getPets().stream().filter(pet -> pet.getPetItem().equals(petItem)).findAny().orElse(null);
+            if (p == null) {
+                // only create a new pet if the active state is > 0 (active), but isn't added to our own list yet
+                p = petItem.createPet(this);
+                addPet(p);
+            }
+            getMap().broadcastMessage(PetPacket.petActivateChange(p, true, (byte) 0));
+        }
+    }
 
     public Skill getSkill(int skillId) {
         return getSkill(skillId, false);
@@ -1674,6 +1697,22 @@ public class MapleCharacter implements Serializable {
         addMeso(-amount);
     }
 
+    public void deductMoney(long amount, boolean cashShop) {
+        if (!cashShop) {
+            addMeso(-amount);
+        } else {
+            long meso = getMeso();
+            long newMeso = meso + amount;
+            if (newMeso >= 0) {
+                newMeso = Math.min(GameConstants.MAX_MONEY, newMeso);
+                Map<Stat, Long> stats = new HashMap<>();
+                setMeso(newMeso);
+                stats.put(Stat.MESO, newMeso);
+                announce(CashShopPacket.updatePlayerStats(stats, this));
+            }
+        }
+    }
+
     public int getSpentHyperStatSp() {
         int sp = 0;
         for (int skillId = 80000400; skillId <= 80000418; skillId++) {
@@ -1984,4 +2023,27 @@ public class MapleCharacter implements Serializable {
         return activeNickItemId;
     }
 
+    public boolean isBattleRecordOn() {
+        return battleRecordOn;
+    }
+
+    public void setBattleRecordOn(boolean battleRecordOn) {
+        this.battleRecordOn = battleRecordOn;
+    }
+
+    public Map<BaseStat, Integer> getTotalBasicStats() {
+        Map<BaseStat, Integer> stats = new HashMap<>();
+        for (BaseStat bs : BaseStat.values()) {
+            stats.put(bs, getTotalStat(bs));
+        }
+        return stats;
+    }
+
+    public DamageCalc getDamageCalc() {
+        return damageCalc;
+    }
+
+    public void setDamageCalc(DamageCalc damageCalc) {
+        this.damageCalc = damageCalc;
+    }
 }

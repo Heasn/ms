@@ -1,10 +1,18 @@
 package im.cave.ms.client.field.obj.mob;
 
+import im.cave.ms.client.character.MapleCharacter;
 import im.cave.ms.client.character.Option;
+import im.cave.ms.client.character.skill.BurnedInfo;
+import im.cave.ms.client.character.skill.Skill;
 import im.cave.ms.connection.netty.OutPacket;
+import im.cave.ms.connection.packet.MobPacket;
 import im.cave.ms.connection.server.service.EventManager;
+import im.cave.ms.provider.data.SkillData;
+import im.cave.ms.provider.info.SkillInfo;
 import im.cave.ms.tools.Tuple;
+import im.cave.ms.tools.Util;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -13,6 +21,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ScheduledFuture;
+import java.util.stream.Collectors;
 
 import static im.cave.ms.client.field.obj.mob.MobStat.ACC;
 import static im.cave.ms.client.field.obj.mob.MobStat.AddDamParty;
@@ -50,10 +59,13 @@ import static im.cave.ms.client.field.obj.mob.MobStat.SeperateSoulP;
 import static im.cave.ms.client.field.obj.mob.MobStat.SoulExplosion;
 import static im.cave.ms.client.field.obj.mob.MobStat.Speed;
 import static im.cave.ms.client.field.obj.mob.MobStat.TrueSight;
+import static im.cave.ms.enums.SkillStat.dotInterval;
+import static im.cave.ms.enums.SkillStat.dotSuperpos;
+import static im.cave.ms.enums.SkillStat.dotTime;
 
 
 public class MobTemporaryStat {
-    //	private List<BurnedInfo> burnedInfos = new ArrayList<>();
+    private List<BurnedInfo> burnedInfos = new ArrayList<>();
     private Map<Tuple<Integer, Integer>, ScheduledFuture> burnCancelSchedules = new HashMap<>();
     private Map<Tuple<Integer, Integer>, ScheduledFuture> burnSchedules = new HashMap<>();
     private String linkTeam;
@@ -84,10 +96,10 @@ public class MobTemporaryStat {
 
     public MobTemporaryStat deepCopy() {
         MobTemporaryStat copy = new MobTemporaryStat(getMob());
-//		copy.setBurnedInfos(new ArrayList<>());
-//		for (BurnedInfo bi : getBurnedInfos()) {
-//			copy.getBurnedInfos().add(bi.deepCopy());
-//		}
+        copy.setBurnedInfos(new ArrayList<>());
+        for (BurnedInfo bi : getBurnedInfos()) {
+            copy.getBurnedInfos().add(bi.deepCopy());
+        }
         copy.setLinkTeam(getLinkTeam());
         copy.mobStatComparator = getMobStatComparator();
         for (MobStat ms : getCurrentStatVals().keySet()) {
@@ -108,11 +120,11 @@ public class MobTemporaryStat {
         return getRemovedStatVals().getOrDefault(mobStat, null);
     }
 
-    public void encode(OutPacket outPacket) {
+    public void encode(OutPacket out) {
         synchronized (currentStatVals) {
             int[] mask = getNewMask();
             for (int j : mask) {
-                outPacket.writeInt(j);
+                out.writeInt(j);
             }
 
             for (Map.Entry<MobStat, Option> entry : getNewStatVals().entrySet()) {
@@ -159,6 +171,7 @@ public class MobTemporaryStat {
                     case Fatality:
                     case Lifting:
                     case DeadlyCharge:
+                    case LucidNightmare:
                     case Smite:
                     case AddDamSkill:
                     case Incizing:
@@ -194,153 +207,154 @@ public class MobTemporaryStat {
                     case Invincible:
                     case Explosion:
                     case HangOver:
-                        outPacket.writeInt(getNewOptionsByMobStat(mobStat).nOption);
-                        outPacket.writeInt(getNewOptionsByMobStat(mobStat).rOption);
-                        outPacket.writeShort(getNewOptionsByMobStat(mobStat).tOption / 500);
+                        out.writeInt(getNewOptionsByMobStat(mobStat).nOption);
+                        out.writeInt(getNewOptionsByMobStat(mobStat).rOption);
+                        out.writeShort(getNewOptionsByMobStat(mobStat).tOption / 500);
                 }
             }
             if (hasNewMobStat(PDR)) {
-                outPacket.writeInt(getNewOptionsByMobStat(PDR).cOption);
+                out.writeInt(getNewOptionsByMobStat(PDR).cOption);
             }
             if (hasNewMobStat(MDR)) {
-                outPacket.writeInt(getNewOptionsByMobStat(MDR).cOption);
+                out.writeInt(getNewOptionsByMobStat(MDR).cOption);
             }
             if (hasNewMobStat(PCounter)) {
-                outPacket.writeInt(getNewOptionsByMobStat(PCounter).wOption);
+                out.writeInt(getNewOptionsByMobStat(PCounter).wOption);
             }
             if (hasNewMobStat(MCounter)) {
-                outPacket.writeInt(getNewOptionsByMobStat(MCounter).wOption);
+                out.writeInt(getNewOptionsByMobStat(MCounter).wOption);
             }
             if (hasNewMobStat(PCounter)) {
-                outPacket.writeInt(getNewOptionsByMobStat(PCounter).mOption); // nCounterProb
-                outPacket.write(getNewOptionsByMobStat(PCounter).bOption); // bCounterDelay
-                outPacket.writeInt(getNewOptionsByMobStat(PCounter).nReason); // nAggroRank
+                out.writeInt(getNewOptionsByMobStat(PCounter).mOption); // nCounterProb
+                out.write(getNewOptionsByMobStat(PCounter).bOption); // bCounterDelay
+                out.writeInt(getNewOptionsByMobStat(PCounter).nReason); // nAggroRank
             } else if (hasNewMobStat(MCounter)) {
-                outPacket.writeInt(getNewOptionsByMobStat(MCounter).mOption); // nCounterProb
-                outPacket.write(getNewOptionsByMobStat(MCounter).bOption); // bCounterDelay
-                outPacket.writeInt(getNewOptionsByMobStat(MCounter).nReason); // nAggroRank
+                out.writeInt(getNewOptionsByMobStat(MCounter).mOption); // nCounterProb
+                out.write(getNewOptionsByMobStat(MCounter).bOption); // bCounterDelay
+                out.writeInt(getNewOptionsByMobStat(MCounter).nReason); // nAggroRank
             }
             if (hasNewMobStat(Fatality)) {
-                outPacket.writeInt(getNewOptionsByMobStat(Fatality).wOption);
-                outPacket.writeInt(getNewOptionsByMobStat(Fatality).uOption);
-                outPacket.writeInt(getNewOptionsByMobStat(Fatality).pOption);
-                outPacket.writeInt(getNewOptionsByMobStat(Fatality).yOption);
-                outPacket.writeInt(getNewOptionsByMobStat(Fatality).mOption);
+                out.writeInt(getNewOptionsByMobStat(Fatality).wOption);
+                out.writeInt(getNewOptionsByMobStat(Fatality).uOption);
+                out.writeInt(getNewOptionsByMobStat(Fatality).pOption);
+                out.writeInt(getNewOptionsByMobStat(Fatality).yOption);
+                out.writeInt(getNewOptionsByMobStat(Fatality).mOption);
             }
             if (hasNewMobStat(Explosion)) {
-                outPacket.writeInt(getNewOptionsByMobStat(Explosion).wOption);
+                out.writeInt(getNewOptionsByMobStat(Explosion).wOption);
             }
             if (hasNewMobStat(ExtraBuffStat)) {
                 List<Option> values = getNewOptionsByMobStat(ExtraBuffStat).extraOpts;
-                outPacket.writeBool(values.size() > 0);
+                out.writeBool(values.size() > 0);
                 if (values.size() > 0) {
-                    outPacket.writeInt(getNewOptionsByMobStat(ExtraBuffStat).extraOpts.get(0).nOption); // nPAD
-                    outPacket.writeInt(getNewOptionsByMobStat(ExtraBuffStat).extraOpts.get(0).mOption); // nMAD
-                    outPacket.writeInt(getNewOptionsByMobStat(ExtraBuffStat).extraOpts.get(0).xOption); // nPDR
-                    outPacket.writeInt(getNewOptionsByMobStat(ExtraBuffStat).extraOpts.get(0).yOption); // nMDR
+                    out.writeInt(getNewOptionsByMobStat(ExtraBuffStat).extraOpts.get(0).nOption); // nPAD
+                    out.writeInt(getNewOptionsByMobStat(ExtraBuffStat).extraOpts.get(0).mOption); // nMAD
+                    out.writeInt(getNewOptionsByMobStat(ExtraBuffStat).extraOpts.get(0).xOption); // nPDR
+                    out.writeInt(getNewOptionsByMobStat(ExtraBuffStat).extraOpts.get(0).yOption); // nMDR
                 }
             }
             if (hasNewMobStat(DeadlyCharge)) {
-                outPacket.writeInt(getNewOptionsByMobStat(DeadlyCharge).pOption);
-                outPacket.writeInt(getNewOptionsByMobStat(DeadlyCharge).pOption);
+                out.writeInt(getNewOptionsByMobStat(DeadlyCharge).pOption);
+                out.writeInt(getNewOptionsByMobStat(DeadlyCharge).pOption);
             }
             if (hasNewMobStat(Incizing)) {
-                outPacket.writeInt(getNewOptionsByMobStat(Incizing).wOption);
-                outPacket.writeInt(getNewOptionsByMobStat(Incizing).uOption);
-                outPacket.writeInt(getNewOptionsByMobStat(Incizing).pOption);
+                out.writeInt(getNewOptionsByMobStat(Incizing).wOption);
+                out.writeInt(getNewOptionsByMobStat(Incizing).uOption);
+                out.writeInt(getNewOptionsByMobStat(Incizing).pOption);
             }
             if (hasNewMobStat(Speed)) {
-                outPacket.write(getNewOptionsByMobStat(Speed).mOption);
+                out.write(getNewOptionsByMobStat(Speed).mOption);
             }
             if (hasNewMobStat(BMageDebuff)) {
-                outPacket.writeInt(getNewOptionsByMobStat(BMageDebuff).cOption);
+                out.writeInt(getNewOptionsByMobStat(BMageDebuff).cOption);
             }
             if (hasNewMobStat(DarkLightning)) {
-                outPacket.writeInt(getNewOptionsByMobStat(DarkLightning).cOption);
+                out.writeInt(getNewOptionsByMobStat(DarkLightning).cOption);
             }
             if (hasNewMobStat(BattlePvPHelenaMark)) {
-                outPacket.writeInt(getNewOptionsByMobStat(BattlePvPHelenaMark).cOption);
+                out.writeInt(getNewOptionsByMobStat(BattlePvPHelenaMark).cOption);
             }
             if (hasNewMobStat(MultiPMDR)) {
-                outPacket.writeInt(getNewOptionsByMobStat(MultiPMDR).cOption);
+                out.writeInt(getNewOptionsByMobStat(MultiPMDR).cOption);
             }
             if (hasNewMobStat(Freeze)) {
-                outPacket.writeInt(getNewOptionsByMobStat(Freeze).cOption);
+                out.writeInt(getNewOptionsByMobStat(Freeze).cOption);
             }
-//            if (hasNewMobStat(MobStat.BurnedInfo)) {
-//                outPacket.write(getBurnedInfos().size());
-//                for (BurnedInfo bi : getBurnedInfos()) {
-//                    bi.encode(outPacket);
-//                }
-//            }
+            if (hasNewMobStat(MobStat.BurnedInfo)) {
+                out.write(getBurnedInfos().size());
+                for (BurnedInfo bi : getBurnedInfos()) {
+                    out.writeInt(0);
+                    bi.encode(out);
+                }
+            }
             if (hasNewMobStat(InvincibleBalog)) {
-                outPacket.write(getNewOptionsByMobStat(InvincibleBalog).nOption);
-                outPacket.write(getNewOptionsByMobStat(InvincibleBalog).bOption);
+                out.write(getNewOptionsByMobStat(InvincibleBalog).nOption);
+                out.write(getNewOptionsByMobStat(InvincibleBalog).bOption);
             }
             if (hasNewMobStat(ExchangeAttack)) {
-                outPacket.write(getNewOptionsByMobStat(ExchangeAttack).bOption);
+                out.write(getNewOptionsByMobStat(ExchangeAttack).bOption);
             }
             if (hasNewMobStat(AddDamParty)) {
-                outPacket.writeInt(getNewOptionsByMobStat(AddDamParty).wOption);
-                outPacket.writeInt(getNewOptionsByMobStat(AddDamParty).pOption);
-                outPacket.writeInt(getNewOptionsByMobStat(AddDamParty).cOption);
+                out.writeInt(getNewOptionsByMobStat(AddDamParty).wOption);
+                out.writeInt(getNewOptionsByMobStat(AddDamParty).pOption);
+                out.writeInt(getNewOptionsByMobStat(AddDamParty).cOption);
             }
             if (hasNewMobStat(LinkTeam)) {
-                outPacket.writeMapleAsciiString(getLinkTeam());
+                out.writeMapleAsciiString(getLinkTeam());
             }
             if (hasNewMobStat(SoulExplosion)) {
-                outPacket.writeInt(getNewOptionsByMobStat(SoulExplosion).nOption);
-                outPacket.writeInt(getNewOptionsByMobStat(SoulExplosion).rOption);
-                outPacket.writeInt(getNewOptionsByMobStat(SoulExplosion).wOption);
+                out.writeInt(getNewOptionsByMobStat(SoulExplosion).nOption);
+                out.writeInt(getNewOptionsByMobStat(SoulExplosion).rOption);
+                out.writeInt(getNewOptionsByMobStat(SoulExplosion).wOption);
             }
             if (hasNewMobStat(SeperateSoulP)) {
-                outPacket.writeInt(getNewOptionsByMobStat(SeperateSoulP).nOption);
-                outPacket.writeInt(getNewOptionsByMobStat(SeperateSoulP).rOption);
-                outPacket.writeShort(getNewOptionsByMobStat(SeperateSoulP).tOption / 500);
-                outPacket.writeInt(getNewOptionsByMobStat(SeperateSoulP).wOption);
-                outPacket.writeInt(getNewOptionsByMobStat(SeperateSoulP).uOption);
+                out.writeInt(getNewOptionsByMobStat(SeperateSoulP).nOption);
+                out.writeInt(getNewOptionsByMobStat(SeperateSoulP).rOption);
+                out.writeShort(getNewOptionsByMobStat(SeperateSoulP).tOption / 500);
+                out.writeInt(getNewOptionsByMobStat(SeperateSoulP).wOption);
+                out.writeInt(getNewOptionsByMobStat(SeperateSoulP).uOption);
             }
             if (hasNewMobStat(SeperateSoulC)) {
-                outPacket.writeInt(getNewOptionsByMobStat(SeperateSoulC).nOption);
-                outPacket.writeInt(getNewOptionsByMobStat(SeperateSoulC).rOption);
-                outPacket.writeShort(getNewOptionsByMobStat(SeperateSoulC).tOption / 500);
-                outPacket.writeInt(getNewOptionsByMobStat(SeperateSoulC).wOption);
+                out.writeInt(getNewOptionsByMobStat(SeperateSoulC).nOption);
+                out.writeInt(getNewOptionsByMobStat(SeperateSoulC).rOption);
+                out.writeShort(getNewOptionsByMobStat(SeperateSoulC).tOption / 500);
+                out.writeInt(getNewOptionsByMobStat(SeperateSoulC).wOption);
             }
             if (hasNewMobStat(Ember)) {
-                outPacket.writeInt(getNewOptionsByMobStat(Ember).nOption);
-                outPacket.writeInt(getNewOptionsByMobStat(Ember).rOption);
-                outPacket.writeInt(getNewOptionsByMobStat(Ember).wOption);
-                outPacket.writeInt(getNewOptionsByMobStat(Ember).tOption / 500);
-                outPacket.writeInt(getNewOptionsByMobStat(Ember).uOption);
+                out.writeInt(getNewOptionsByMobStat(Ember).nOption);
+                out.writeInt(getNewOptionsByMobStat(Ember).rOption);
+                out.writeInt(getNewOptionsByMobStat(Ember).wOption);
+                out.writeInt(getNewOptionsByMobStat(Ember).tOption / 500);
+                out.writeInt(getNewOptionsByMobStat(Ember).uOption);
             }
             if (hasNewMobStat(TrueSight)) {
-                outPacket.writeInt(getNewOptionsByMobStat(TrueSight).nOption);
-                outPacket.writeInt(getNewOptionsByMobStat(TrueSight).rOption);
-                outPacket.writeInt(getNewOptionsByMobStat(TrueSight).tOption / 500);
-                outPacket.writeInt(getNewOptionsByMobStat(TrueSight).cOption);
-                outPacket.writeInt(getNewOptionsByMobStat(TrueSight).pOption);
-                outPacket.writeInt(getNewOptionsByMobStat(TrueSight).uOption);
-                outPacket.writeInt(getNewOptionsByMobStat(TrueSight).wOption);
+                out.writeInt(getNewOptionsByMobStat(TrueSight).nOption);
+                out.writeInt(getNewOptionsByMobStat(TrueSight).rOption);
+                out.writeInt(getNewOptionsByMobStat(TrueSight).tOption / 500);
+                out.writeInt(getNewOptionsByMobStat(TrueSight).cOption);
+                out.writeInt(getNewOptionsByMobStat(TrueSight).pOption);
+                out.writeInt(getNewOptionsByMobStat(TrueSight).uOption);
+                out.writeInt(getNewOptionsByMobStat(TrueSight).wOption);
             }
             if (hasNewMobStat(MultiDamSkill)) {
-                outPacket.writeInt(getNewOptionsByMobStat(MultiDamSkill).cOption);
+                out.writeInt(getNewOptionsByMobStat(MultiDamSkill).cOption);
             }
             if (hasNewMobStat(Laser)) {
-                outPacket.writeInt(getNewOptionsByMobStat(Laser).nOption);
-                outPacket.writeInt(getNewOptionsByMobStat(Laser).rOption);
-                outPacket.writeInt(getNewOptionsByMobStat(Laser).tOption / 500);
-                outPacket.writeInt(getNewOptionsByMobStat(Laser).wOption);
-                outPacket.writeInt(getNewOptionsByMobStat(Laser).uOption);
+                out.writeInt(getNewOptionsByMobStat(Laser).nOption);
+                out.writeInt(getNewOptionsByMobStat(Laser).rOption);
+                out.writeInt(getNewOptionsByMobStat(Laser).tOption / 500);
+                out.writeInt(getNewOptionsByMobStat(Laser).wOption);
+                out.writeInt(getNewOptionsByMobStat(Laser).uOption);
             }
             if (hasNewMobStat(ElementResetBySummon)) {
-                outPacket.writeInt(getNewOptionsByMobStat(ElementResetBySummon).cOption);
-                outPacket.writeInt(getNewOptionsByMobStat(ElementResetBySummon).pOption);
-                outPacket.writeInt(getNewOptionsByMobStat(ElementResetBySummon).uOption);
-                outPacket.writeInt(getNewOptionsByMobStat(ElementResetBySummon).wOption);
+                out.writeInt(getNewOptionsByMobStat(ElementResetBySummon).cOption);
+                out.writeInt(getNewOptionsByMobStat(ElementResetBySummon).pOption);
+                out.writeInt(getNewOptionsByMobStat(ElementResetBySummon).uOption);
+                out.writeInt(getNewOptionsByMobStat(ElementResetBySummon).wOption);
             }
             if (hasNewMobStat(BahamutLightElemAddDam)) {
-                outPacket.writeInt(getNewOptionsByMobStat(BahamutLightElemAddDam).pOption);
-                outPacket.writeInt(getNewOptionsByMobStat(BahamutLightElemAddDam).cOption);
+                out.writeInt(getNewOptionsByMobStat(BahamutLightElemAddDam).pOption);
+                out.writeInt(getNewOptionsByMobStat(BahamutLightElemAddDam).cOption);
             }
             getNewStatVals().clear();
         }
@@ -351,9 +365,9 @@ public class MobTemporaryStat {
         for (MobStat mobStat : map.keySet()) {
             res[mobStat.getPos()] |= mobStat.getVal();
         }
-        OutPacket outPacket = new OutPacket();
+        OutPacket out = new OutPacket();
         for (int re : res) {
-            outPacket.writeInt(re);
+            out.writeInt(re);
         }
         return res;
     }
@@ -383,8 +397,7 @@ public class MobTemporaryStat {
     }
 
     public boolean hasBurnFromSkillAndOwner(int skillID, int ownerCID) {
-//        return getBurnBySkillAndOwner(skillID, ownerCID) != null;
-        return false;
+        return getBurnBySkillAndOwner(skillID, ownerCID) != null;
     }
 
     /**
@@ -396,15 +409,15 @@ public class MobTemporaryStat {
      *
      * @return the BurnedInfo of the burn on this MTS, or null if there is none
      */
-//    public BurnedInfo getBurnBySkillAndOwner(int skillID, int ownerCID) {
-//        BurnedInfo res = null;
-//        for (BurnedInfo bi : getBurnedInfos()) {
-//            if (bi.getSkillId() == skillID && (bi.getCharacterId() == ownerCID || ownerCID == 0)) {
-//                res = bi;
-//            }
-//        }
-//        return res; // wow no lambda for once
-//    }
+    public BurnedInfo getBurnBySkillAndOwner(int skillID, int ownerCID) {
+        BurnedInfo res = null;
+        for (BurnedInfo bi : getBurnedInfos()) {
+            if (bi.getSkillId() == skillID && (bi.getCharacterId() == ownerCID || ownerCID == 0)) {
+                res = bi;
+            }
+        }
+        return res; // wow no lambda for once
+    }
 
     public boolean hasRemovedMobStat(MobStat mobStat) {
         return getRemovedStatVals().containsKey(mobStat);
@@ -426,7 +439,7 @@ public class MobTemporaryStat {
         synchronized (currentStatVals) {
             getRemovedStatVals().put(mobStat, getCurrentStatVals().get(mobStat));
             getCurrentStatVals().remove(mobStat);
-//            getMob().getMap().broadcastMessage(MobPool.statReset(getMob(), (byte) 1, false));
+            getMob().getMap().broadcastMessage(MobPacket.statReset(getMob(), (byte) 1, false));
             getSchedules().remove(mobStat);
             if (!fromSchedule && getSchedules().containsKey(mobStat)) {
                 getSchedules().get(mobStat).cancel(true);
@@ -437,33 +450,33 @@ public class MobTemporaryStat {
         }
     }
 
-//    public void removeBurnedInfo(Char chr, boolean fromSchedule) {
-//        synchronized (burnedInfos) {
-//            int charID = chr.getId();
-//            List<BurnedInfo> biList = getBurnedInfos().stream().filter(bi -> bi.getCharacterId() == charID).collect(Collectors.toList());
-//            getBurnedInfos().removeAll(biList);
-//            getRemovedStatVals().put(MobStat.BurnedInfo, getCurrentOptionsByMobStat(MobStat.BurnedInfo));
-//            if (getBurnedInfos().size() == 0) {
-//                getCurrentStatVals().remove(MobStat.BurnedInfo);
-//            }
-//            getMob().getField().broadcastPacket(MobPool.statReset(getMob(), (byte) 1, false, biList));
-//            if (chr.isBattleRecordOn()) {
-//                for (net.swordie.ms.life.mob.skill.BurnedInfo bi : biList) {
-//                    int count = Math.min(bi.getDotCount(), (Util.getCurrentTime() - bi.getStartTime()) / bi.getInterval());
-//                    chr.write(BattleRecordMan.dotDamageInfo(bi, count));
-//                }
-//            }
-//            if (!fromSchedule) {
-//                getBurnCancelSchedules().get(charID).cancel(true);
-//                getBurnCancelSchedules().remove(charID);
-//                getBurnSchedules().get(charID).cancel(true);
-//                getBurnSchedules().remove(charID);
-//            } else {
-//                getBurnCancelSchedules().remove(charID);
-//                getBurnSchedules().remove(charID);
-//            }
-//        }
-//    }
+    public void removeBurnedInfo(MapleCharacter chr, boolean fromSchedule) {
+        synchronized (burnedInfos) {
+            int charId = chr.getId();
+            List<BurnedInfo> biList = getBurnedInfos().stream().filter(bi -> bi.getCharacterId() == charId).collect(Collectors.toList());
+            getBurnedInfos().removeAll(biList);
+            getRemovedStatVals().put(MobStat.BurnedInfo, getCurrentOptionsByMobStat(MobStat.BurnedInfo));
+            if (getBurnedInfos().size() == 0) {
+                getCurrentStatVals().remove(MobStat.BurnedInfo);
+            }
+            getMob().getMap().broadcastMessage(MobPacket.statReset(getMob(), (byte) 1, false, biList));
+            if (chr.isBattleRecordOn()) {
+                for (BurnedInfo bi : biList) {
+                    int count = Math.min(bi.getDotCount(), (Util.getCurrentTime() - bi.getStartTime()) / bi.getInterval());
+//                    chr.write(BattleRecordMan.dotDamageInfo(bi, count)); //添加dot伤害到战斗统计中
+                }
+            }
+            if (!fromSchedule) {
+                getBurnCancelSchedules().get(charId).cancel(true);
+                getBurnCancelSchedules().remove(charId);
+                getBurnSchedules().get(charId).cancel(true);
+                getBurnSchedules().remove(charId);
+            } else {
+                getBurnCancelSchedules().remove(charId);
+                getBurnSchedules().remove(charId);
+            }
+        }
+    }
 
     /**
      * Adds a new MobStat to this MobTemporaryStat. Will immediately broadcast the reaction to all
@@ -474,10 +487,10 @@ public class MobTemporaryStat {
      * @param mobStat The MobStat to add.
      * @param option  The Option that contains the values of the stat.
      */
-//    public void addStatOptionsAndBroadcast(MobStat mobStat, Option option) {
-//        addStatOptions(mobStat, option);
-//        mob.getField().broadcastPacket(MobPool.statSet(getMob(), (short) 0));
-//    }
+    public void addStatOptionsAndBroadcast(MobStat mobStat, Option option) {
+        addStatOptions(mobStat, option);
+        mob.getMap().broadcastMessage(MobPacket.statSet(getMob(), (short) 0));
+    }
 
     /**
      * Adds a new MobStat to this MobTemporary stat. Will immediately broadcast the reaction to all
@@ -490,7 +503,7 @@ public class MobTemporaryStat {
      */
     public void addMobSkillOptionsAndBroadCast(MobStat mobStat, Option o) {
         o.rOption |= o.slv << 16; // mob skills are encoded differently: not an int, but short (skill ID), then short (slv).
-//        addStatOptionsAndBroadcast(mobStat, o);
+        addStatOptionsAndBroadcast(mobStat, o);
     }
 
     public void addStatOptions(MobStat mobStat, Option option) {
@@ -509,13 +522,13 @@ public class MobTemporaryStat {
     }
 
 
-//    public List<BurnedInfo> getBurnedInfos() {
-//        return burnedInfos;
-//    }
+    public List<BurnedInfo> getBurnedInfos() {
+        return burnedInfos;
+    }
 
-//    public void setBurnedInfos(List<BurnedInfo> burnedInfos) {
-//        this.burnedInfos = burnedInfos;
-//    }
+    public void setBurnedInfos(List<BurnedInfo> burnedInfos) {
+        this.burnedInfos = burnedInfos;
+    }
 
     public Comparator getMobStatComparator() {
         return mobStatComparator;
@@ -572,49 +585,49 @@ public class MobTemporaryStat {
         getCurrentStatVals().forEach((ms, o) -> removeMobStat(ms, false));
     }
 
-//    public void createAndAddBurnedInfo(Char chr, Skill skill) {
-//        int charId = chr.getId();
-//        SkillInfo si = SkillData.getSkillInfoById(skill.getSkillId());
-//        int slv = skill.getCurrentLevel();
-//        Tuple<Integer, Integer> timerKey = new Tuple<>(charId, skill.getSkillId());
-//        BurnedInfo bi = getBurnBySkillAndOwner(skill.getSkillId(), chr.getId());
-//        int time = si.getValue(dotTime, slv) * 1000;
-//        if (bi == null) {
-//            // create a new burnedinfo, as one didn't exist yet (taking skill + charid combination as key)
-//            bi = new BurnedInfo();
-//            bi.setCharacterId(charId);
-//            bi.setChr(chr);
-//            bi.setSkillId(skill.getSkillId());
-//            bi.setDamage((int) chr.getDamageCalc().calcPDamageForPvM(skill.getSkillId(), (byte) skill.getCurrentLevel()));
-//            bi.setInterval(si.getValue(dotInterval, slv) * 1000);
-//            bi.setDotCount(time / bi.getInterval());
-//            bi.setSuperPos(si.getValue(dotSuperpos, slv));
-//            bi.setAttackDelay(0);
-//            bi.setDotTickIdx(0);
-//            bi.setDotTickDamR(0); //damage added for every tick
-//            bi.setDotAnimation(bi.getAttackDelay() + bi.getInterval() + time);
-//            synchronized (burnedInfos) {
-//                getBurnedInfos().add(bi);
-//            }
-//        } else {
-//            // extend the timer if it does exist
-//            getBurnCancelSchedules().get(timerKey).cancel(true);
-//            getBurnSchedules().get(timerKey).cancel(true);
-//        }
-//        long damage = bi.getDamage();
-//        bi.setStartTime(Util.getCurrentTime());
-//        bi.setLastUpdate(Util.getCurrentTime());
-//        bi.setEnd((int) (System.currentTimeMillis() + time));
-//        Option o = new Option();
-//        o.nOption = 0;
-//        o.rOption = skill.getSkillId();
-//        addStatOptionsAndBroadcast(MobStat.BurnedInfo, o);
-//        ScheduledFuture sf = EventManager.addEvent(() -> removeBurnedInfo(chr, true), time);
-//        ScheduledFuture burn = EventManager.addFixedRateEvent(
-//                () -> getMob().damage(chr, damage), bi.getAttackDelay() + bi.getInterval(), bi.getInterval(), bi.getDotCount());
-//        getBurnCancelSchedules().put(timerKey, sf);
-//        getBurnSchedules().put(timerKey, burn);
-//    }
+    public void createAndAddBurnedInfo(MapleCharacter chr, Skill skill) {
+        int charId = chr.getId();
+        SkillInfo si = SkillData.getSkillInfo(skill.getSkillId());
+        int slv = skill.getCurrentLevel();
+        Tuple<Integer, Integer> timerKey = new Tuple<>(charId, skill.getSkillId());
+        BurnedInfo bi = getBurnBySkillAndOwner(skill.getSkillId(), chr.getId());
+        int time = si.getValue(dotTime, slv) * 1000;
+        if (bi == null) {
+            // create a new burned info, as one didn't exist yet (taking skill + char id combination as key)
+            bi = new BurnedInfo();
+            bi.setCharacterId(charId);
+            bi.setChr(chr);
+            bi.setSkillId(skill.getSkillId());
+            bi.setDamage((int) chr.getDamageCalc().calcPDamageForPvM(skill.getSkillId(), (byte) skill.getCurrentLevel()));
+            bi.setInterval(si.getValue(dotInterval, slv) * 1000);
+            bi.setDotCount(time / bi.getInterval());
+            bi.setSuperPos(si.getValue(dotSuperpos, slv));
+            bi.setAttackDelay(0);
+            bi.setDotTickIdx(0);
+            bi.setDotTickDamR(0); //damage added for every tick
+            bi.setDotAnimation(bi.getAttackDelay() + bi.getInterval() + time);
+            synchronized (burnedInfos) {
+                getBurnedInfos().add(bi);
+            }
+        } else {
+            // extend the timer if it does exist
+            getBurnCancelSchedules().get(timerKey).cancel(true);
+            getBurnSchedules().get(timerKey).cancel(true);
+        }
+        long damage = bi.getDamage();
+        bi.setStartTime(Util.getCurrentTime());
+        bi.setLastUpdate(Util.getCurrentTime());
+        bi.setEnd((int) (System.currentTimeMillis() + time));
+        Option o = new Option();
+        o.nOption = 0;
+        o.rOption = skill.getSkillId();
+        addStatOptionsAndBroadcast(MobStat.BurnedInfo, o);
+        ScheduledFuture sf = EventManager.addEvent(() -> removeBurnedInfo(chr, true), time);
+        ScheduledFuture burn = EventManager.addFixedRateEvent(
+                () -> getMob().damage(chr, damage), bi.getAttackDelay() + bi.getInterval(), bi.getInterval(), bi.getDotCount());
+        getBurnCancelSchedules().put(timerKey, sf);
+        getBurnSchedules().put(timerKey, burn);
+    }
 
     public Map<Tuple<Integer, Integer>, ScheduledFuture> getBurnCancelSchedules() {
         return burnCancelSchedules;
@@ -639,13 +652,13 @@ public class MobTemporaryStat {
         if (hasCurrentMobStat(EVA) && getCurrentOptionsByMobStat(EVA).nOption > 0) {
             removeMobStat(EVA, false);
         }
-//        getMob().getField().broadcastPacket(MobPool.statReset(getMob(), (byte) 0, false));
+        getMob().getMap().broadcastMessage(MobPacket.statReset(getMob(), (byte) 0, false));
     }
 
     public void removeEverything() {
         Set<MobStat> mobStats = new HashSet<>(getCurrentStatVals().keySet());
         mobStats.stream().filter(ms -> ms != MobStat.BurnedInfo).forEach(ms -> removeMobStat(ms, false));
-//        Set<BurnedInfo> burnedInfos = new HashSet<>(getBurnedInfos());
-//        burnedInfos.forEach(bi -> removeBurnedInfo(bi.getChr(), false));
+        Set<BurnedInfo> burnedInfos = new HashSet<>(getBurnedInfos());
+        burnedInfos.forEach(bi -> removeBurnedInfo(bi.getChr(), false));
     }
 }

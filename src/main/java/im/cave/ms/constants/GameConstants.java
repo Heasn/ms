@@ -2,6 +2,7 @@ package im.cave.ms.constants;
 
 import im.cave.ms.client.character.items.Equip;
 import im.cave.ms.client.field.QuickMoveInfo;
+import im.cave.ms.enums.BaseStat;
 import im.cave.ms.enums.EnchantStat;
 import im.cave.ms.enums.QuickMoveType;
 import im.cave.ms.provider.data.ItemData;
@@ -42,7 +43,6 @@ public class GameConstants {
     public static final int POTION_POT_MAX_LIMIT = 10000000;
     public static final int MAX_FLAME_BONUS_SAGAS = 6;
     public static final int FLAME_STAT_MULTIPLE = 1000;
-    public static final int CREATE_GUILD_COST = 5000000;
     //  default keymap
     public static final byte[] DEFAULT_KEY = {1, 2, 3, 4, 5, 6, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 29, 31, 34, 35, 37, 38, 39, 40, 41, 43, 44, 45, 46, 47, 48, 50, 56, 57, 59, 60, 61, 63, 64, 65, 66, 70};
     public static final byte[] DEFAULT_TYPE = {4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 4, 4, 4, 4, 5, 5, 6, 6, 6, 6, 6, 6, 6, 4};
@@ -71,6 +71,8 @@ public class GameConstants {
     public static final int GGP_FOR_SKILL_RESET = 50000;
     public static final int MAX_GUILD_LV = 30;
     public static final int MAX_GUILD_MEMBERS = 200;
+    public static final int CREATE_GUILD_COST = 5000000;
+    public static final int GUILD_MAX_MEMBERS_DEFAULT = 10;
     //drop
     public static final int DROP_HEIGHT = 100; // was 20
     public static final int DROP_REMAIN_ON_GROUND_TIME = 120; // 2 minutes
@@ -529,4 +531,49 @@ public class GameConstants {
         }
         return guildExp[curLevel];
     }
+
+    public static BaseStat getMainStatForJob(short job) {
+        if (JobConstants.isBeginnerJob(job) || JobConstants.isBuccaneer(job) || JobConstants.isAdventurerPirate(job)
+                || JobConstants.isPinkBean(job) || JobConstants.isDawnWarrior(job) || JobConstants.isKaiser(job)
+                || JobConstants.isZero(job) || JobConstants.isDemon(job)
+                || JobConstants.isDemonSlayer(job) || JobConstants.isAran(job) || JobConstants.isCannonShooter(job)
+                || JobConstants.isDarkKnight(job) || JobConstants.isHero(job) || JobConstants.isPage(job)
+                || JobConstants.isBlaster(job) || JobConstants.isHayato(job) || JobConstants.isMihile(job)
+                || JobConstants.isShade(job) || JobConstants.isThunderBreaker(job) || JobConstants.isAdventurerWarrior(job)) {
+            return BaseStat.str;
+        } else if (JobConstants.isJett(job) || JobConstants.isCorsair(job) || JobConstants.isWildHunter(job)
+                || JobConstants.isMercedes(job) || JobConstants.isAngelicBuster(job) || JobConstants.isWindArcher(job)
+                || JobConstants.isAdventurerArcher(job)) {
+            return BaseStat.dex;
+        } else if (JobConstants.isBeastTamer(job) || JobConstants.isBlazeWizard(job) || JobConstants.isCleric(job)
+                || JobConstants.isEvan(job) || JobConstants.isIceLightning(job) || JobConstants.isFirePoison(job)
+                || JobConstants.isAdventurerMage(job) || JobConstants.isKanna(job) || JobConstants.isKinesis(job)
+                || JobConstants.isLuminous(job)) {
+            return BaseStat.inte;
+        } else if (JobConstants.isAdventurerThief(job) || JobConstants.isNightLord(job) || JobConstants.isShadower(job)
+                || JobConstants.isPhantom(job) || JobConstants.isNightWalker(job) || JobConstants.isDualBlade(job)) {
+            return BaseStat.luk;
+        } else if (JobConstants.isDemonAvenger(job)) {
+            return BaseStat.mhp;
+        }
+        return null;
+    }
+
+
+    public static BaseStat getSecStatByMainStat(BaseStat mainStat) {
+        if (mainStat == null) {
+            return null;
+        }
+        switch (mainStat) {
+            case str:
+            case luk:
+                return BaseStat.dex;
+            case dex:
+                return BaseStat.str;
+            case inte:
+                return BaseStat.luk;
+        }
+        return null;
+    }
+
 }

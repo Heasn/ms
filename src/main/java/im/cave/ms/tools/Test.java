@@ -21,6 +21,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Set;
 
@@ -32,19 +33,18 @@ import java.util.Set;
  */
 public class Test {
     public static void main(String[] args) {
-        Set<JobType> advancedJobs = JobType.getAdvancedJobs(100);
-//        System.out.println(JobType.getAllAdvancedJobs(100));
+        //        System.out.println(JobType.getAllAdvancedJobs(100));
 //        QuestData.loadQuests();
 //        SkillData.loadMakingRecipeSkills();
 //        MobData.loadMobsData();
 //        System.out.println(DateUtil.FT_OFFSET);
 //        long timestamp = DateUtil.getTimestamp(132571759860000000L);
 //        System.out.println(DateUtil.getTimeFromTimestamp(timestamp));
-        //        try {
-//            scriptTest();
-//        } catch (FileNotFoundException | ScriptException | NoSuchMethodException e) {
-//            e.printStackTrace();
-//        }
+        try {
+            scriptTest();
+        } catch (FileNotFoundException | ScriptException | NoSuchMethodException e) {
+            e.printStackTrace();
+        }
     }
 
 
