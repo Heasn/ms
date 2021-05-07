@@ -8,16 +8,7 @@ import im.cave.ms.tools.Util;
 import lombok.Getter;
 import lombok.Setter;
 
-import javax.persistence.CascadeType;
-import javax.persistence.Entity;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.OneToMany;
-import javax.persistence.Table;
+import javax.persistence.*;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -60,7 +51,8 @@ public class Inventory {
         return items;
     }
 
-    public Item getItem(short pos) {
+
+    public Item getItem(int pos) {
         return getItems().stream().filter(item -> item.pos == pos).findAny().orElse(null);
     }
 
@@ -131,6 +123,10 @@ public class Inventory {
 
     public Item getItemByItemID(int itemId) {
         return getItems().stream().filter(item -> item.getItemId() == itemId).findFirst().orElse(null);
+    }
+
+    public int getItemQuantity(int itemId) {
+        return getItems().stream().filter(item -> item.getItemId() == itemId).mapToInt(Item::getQuantity).sum();
     }
 
     public Item getItemByItemIDAndStackable(int itemId) {

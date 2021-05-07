@@ -1,6 +1,7 @@
 package im.cave.ms.connection.packet;
 
 import im.cave.ms.client.character.MapleCharacter;
+import im.cave.ms.client.character.PortableChair;
 import im.cave.ms.client.character.items.Equip;
 import im.cave.ms.client.character.items.Item;
 import im.cave.ms.client.character.items.PetItem;
@@ -14,6 +15,7 @@ import im.cave.ms.client.multiplayer.guilds.Guild;
 import im.cave.ms.connection.netty.OutPacket;
 import im.cave.ms.connection.packet.opcode.SendOpcode;
 import im.cave.ms.enums.BodyPart;
+import im.cave.ms.tools.Rect;
 
 import java.util.List;
 import java.util.Map;
@@ -92,14 +94,14 @@ public class UserRemote {
         OutPacket out = new OutPacket();
 
         switch (attackInfo.attackHeader) {
-            case CLOSE_RANGE_ATTACK:
-                out.writeShort(SendOpcode.REMOTE_CLOSE_RANGE_ATTACK.getValue());
+            case USER_MELEE_ATTACK:
+                out.writeShort(SendOpcode.REMOTE_USER_MELEE_ATTACK.getValue());
                 break;
-            case RANGED_ATTACK:
-                out.writeShort(SendOpcode.REMOTE_RANGED_ATTACK.getValue());
+            case USER_SHOOT_ATTACK:
+                out.writeShort(SendOpcode.REMOTE_USER_SHOOT_ATTACK.getValue());
                 break;
-            case MAGIC_ATTACK:
-                out.writeShort(SendOpcode.REMOTE_MAGIC_ATTACK.getValue());
+            case USER_MAGIC_ATTACK:
+                out.writeShort(SendOpcode.REMOTE_USER_MAGIC_ATTACK.getValue());
                 break;
         }
 
@@ -110,12 +112,13 @@ public class UserRemote {
         out.writeInt(attackInfo.skillLevel);
         if (attackInfo.skillLevel > 0) {
             out.writeInt(attackInfo.skillId);
+            out.writeInt(0);
         }
+        out.writeInt(8);
         out.writeZeroBytes(10);
         out.write(attackInfo.attackAction);
         out.write(attackInfo.direction);
-
-        out.writeShort(1);
+        out.writeShort(attackInfo.attackActionType);
         out.writeInt(0);
         out.writeShort(1);
         out.write(0);
@@ -181,7 +184,7 @@ public class UserRemote {
         out.write(chr.getStats().getSenseLevel());
         out.write(chr.getStats().getCharmLevel());
         out.writeLong(0);
-        out.writeBool(false); //是否有小屋
+        out.writeBool(false); //是否开启小屋系统
         //if(有小屋){
         //  out.writeInt(myHome.getId());
         //  剩余336位
@@ -225,18 +228,22 @@ public class UserRemote {
         return out;
     }
 
-    public static OutPacket remoteSetActivePortableChair(int charId, int chairId, int unk1, short unk2, int unk3, byte unk4) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.REMOTE_SET_ACTIVE_PORTABLE_CHAIR.getValue());
+    public static OutPacket remoteUserNickItem(int charId, int itemId) {
+        OutPacket out = new OutPacket(SendOpcode.REMOTE_SET_ACTIVE_NICK_ITEM);
+
         out.writeInt(charId);
-        out.writeInt(chairId);
-        out.writeInt(0);
-        out.writeInt(unk3);
-        out.write(unk4);
-        out.writeBool(chairId != 0);
-        out.writeInt(0);
-        out.writeInt(unk1);
-        out.writeShort(unk2);
+        out.writeInt(itemId);
+        out.write(0);
+
+        return out;
+    }
+
+    //todo
+    public static OutPacket remoteSetActivePortableChair(int charId, PortableChair chair) {
+        OutPacket out = new OutPacket(SendOpcode.REMOTE_SET_ACTIVE_PORTABLE_CHAIR);
+
+        out.writeInt(charId);
+
         return out;
     }
 
@@ -256,12 +263,14 @@ public class UserRemote {
 
     public static OutPacket showItemUpgradeEffect(int charId, boolean success, boolean enchantDlg, int uItemId, int eItemId, boolean boom) {
         OutPacket out = new OutPacket(SendOpcode.SHOW_ITEM_UPGRADE_EFFECT);
+
         out.writeInt(charId);
         out.write(boom ? 2 : success ? 1 : 0);
         out.writeBool(enchantDlg);
         out.writeInt(uItemId);
         out.writeInt(eItemId);
         out.write(0); // 0 普通 1 消耗祝福
+
         return out;
     }
 
@@ -278,6 +287,7 @@ public class UserRemote {
 
     public static OutPacket hiddenEffectEquips(MapleCharacter player) {
         OutPacket out = new OutPacket(SendOpcode.HIDDEN_EFFECT_EQUIP);
+
         out.writeInt(player.getId());
         List<Item> items = player.getEquippedInventory().getItems();
         List<Item> equips = items.stream().filter(item -> !((Equip) item).isShowEffect()).collect(Collectors.toList());
@@ -286,6 +296,7 @@ public class UserRemote {
             out.writeInt(equip.getPos());
         }
         out.writeBool(false);
+
         return out;
     }
 
@@ -353,6 +364,19 @@ public class UserRemote {
         return out;
     }
 
+
+    //toto check
+    public static OutPacket showItemSlotOptionExtendEffect(int charId, int itemId, boolean success, boolean boom) {
+        OutPacket out = new OutPacket(SendOpcode.SHOW_ITEM_SLOT_OPTION_EXTEND_EFFECT);
+
+        out.writeInt(charId);
+        out.write(boom ? 2 : success ? 1 : 0);
+        out.writeInt(itemId);
+        out.write(0);
+
+        return out;
+    }
+
     public static OutPacket guildNameChanged(MapleCharacter chr) {
         OutPacket out = new OutPacket(SendOpcode.REMOTE_GUILD_NAME_CHANGED);
 
@@ -378,9 +402,37 @@ public class UserRemote {
 
     public static OutPacket showItemSkillSocketUpgradeEffect(int charId, boolean success) {
         OutPacket out = new OutPacket(SendOpcode.SHOW_ITEM_SKILL_SOCKET_UPGRADE_EFFECT);
+
         out.writeInt(charId);
         out.writeBool(success);
-        out.write(0);
+        out.write(0); //boom
+
+        return out;
+    }
+
+    public static OutPacket showItemSkillOptionUpgradeEffect(int charId, boolean success, boolean boom) {
+        OutPacket out = new OutPacket(SendOpcode.SHOW_ITEM_SKILL_OPTION_UPGRADE_EFFECT);
+
+        out.writeInt(charId);
+        out.writeBool(success);
+        out.writeBool(boom);
+
+        return out;
+    }
+
+    //00 00 00 00
+    // 00 00 00 00
+    // 01 00 00 00
+    // 00 00 00 00
+    public static OutPacket multiPersonChairAreaSet(PortableChair chair, Rect rect) {
+        OutPacket out = new OutPacket(SendOpcode.MULTI_PERSON_CHAIR_AREA);
+
+        out.writeInt(0); //未知
+        out.writeInt(2);
+        out.writeInt(chair.getItemId());
+        out.writeInt(1);
+        out.writeInt(chair.getItemId());
+
         return out;
     }
 }

@@ -34,8 +34,6 @@ public class CharOperationHandler {
         int charId = in.readInt();
         byte invisible = in.readByte();
         if (c.getLoginStatus().equals(LoginStatus.LOGGEDIN) && c.getAccount().getCharacter(charId) != null) {
-            MapleCharacter player = c.getAccount().getCharacter(charId);
-//            c.setPlayer(player);
             c.setLoginStatus(LoginStatus.SERVER_TRANSITION);
             Server.getInstance().addClientInTransfer(c.getChannelId(), charId, c);
             int port = Server.getInstance().getChannel(c.getWorldId(), c.getChannelId()).getPort();
@@ -52,7 +50,7 @@ public class CharOperationHandler {
         MapleCharacter character = c.getAccount().getCharacter(charId);
         long deleteTime = LocalDateTime.now().plusDays(3).toInstant(ZoneOffset.of("+8")).toEpochMilli();
         character.setDeleteTime(DateUtil.getFileTime(deleteTime));
-        c.announce(LoginPacket.deleteTime(charId));
+        c.announce(LoginPacket.reservedDeleteCharacterResult(charId));
     }
 
     public static void handleUserConfirmDeleteChar(InPacket in, MapleClient c) {
@@ -63,7 +61,7 @@ public class CharOperationHandler {
         character.setDeleted(true);
         character.saveToDB();
         c.getAccount().removeChar(charId);
-        c.announce(LoginPacket.deleteTime(charId));
+        c.announce(LoginPacket.reservedDeleteCharacterResult(charId));
         c.announce(MessagePacket.broadcastMsg("删除角色成功，请回到首页重新进入。", BroadcastMsgType.ALERT));
     }
 
@@ -71,7 +69,7 @@ public class CharOperationHandler {
         int charId = in.readInt();
         MapleCharacter character = c.getAccount().getCharacter(charId);
         character.setDeleteTime(0L);
-        c.announce(LoginPacket.cancelDeleteChar(charId));
+        c.announce(LoginPacket.reservedDeleteCharacterCancelResult(charId));
     }
 
     public static void handleAccountCharSlotsExpand(InPacket in, MapleClient c) {
@@ -105,7 +103,7 @@ public class CharOperationHandler {
             c.announce(LoginPacket.checkDuplicatedIDResult(name, (byte) 3));
             return;
         }
-        in.skip(4);
+        in.skip(4); //-1
         int curSelectedRace = in.readInt();
         JobType job = JobConstants.LoginJob.getLoginJobById(curSelectedRace).getBeginJob();
         int mapId = JobConstants.LoginJob.getLoginJobById(curSelectedRace).getBeginMap();
@@ -134,13 +132,13 @@ public class CharOperationHandler {
         }
         {
             chr.setAccId(c.getAccount().getId());
-            chr.setWorld(c.getWorldId());
+            chr.setWorldId(c.getWorldId());
             chr.setSubJob(subJob);
             chr.setGender(gender);
             chr.setSkin(skin);
             chr.setName(name);
             chr.setGm(c.getAccount().isGm());
-            chr.setChannel(c.getChannelId());
+            chr.setChannelId(c.getChannelId());
             chr.getKeyMap().setDefault(keyMode != 0);
             chr.setFace(items[0]);
             chr.setHair(items[1]);
@@ -171,9 +169,25 @@ public class CharOperationHandler {
             MapleCharacter chr = account.getCharacter(charId);
             account.setOnlineChar(chr);
             c.setLoginStatus(LoginStatus.SERVER_TRANSITION);
-//            c.setPlayer(chr);
             Server.getInstance().addClientInTransfer(c.getChannelId(), charId, c);
-            c.announce(LoginPacket.selectCharacterResult(LoginType.Success, (byte) 0, c.getMapleChannel().getPort(), chr.getId()));
+            c.announce(LoginPacket.selectCharacterResult(LoginType.Success, (byte) 0, c.getChannel().getPort(), chr.getId()));
+        }
+    }
+
+    public static void handleOrderCharacter(InPacket in, MapleClient c) {
+        int accId = in.readInt();
+        byte type = in.readByte();
+        int charCount = in.readInt();
+        Account account = c.getAccount();
+        if (accId != account.getId()) {
+            return;
+        }
+        for (int i = 0; i < charCount; i++) {
+            int charId = in.readInt();
+            MapleCharacter character = account.getCharacter(charId);
+            if (character != null) {
+                character.setOrder(i);
+            }
         }
     }
 }

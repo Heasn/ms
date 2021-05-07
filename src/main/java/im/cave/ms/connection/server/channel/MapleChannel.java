@@ -5,6 +5,8 @@ import im.cave.ms.client.field.MapleMap;
 import im.cave.ms.connection.netty.OutPacket;
 import im.cave.ms.connection.netty.ServerAcceptor;
 import im.cave.ms.connection.server.AbstractServer;
+import im.cave.ms.connection.server.Server;
+import im.cave.ms.connection.server.world.World;
 import im.cave.ms.enums.ServerType;
 import im.cave.ms.provider.data.MapData;
 import im.cave.ms.tools.Util;
@@ -18,7 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * @author fair
  * @version V1.0
- * @Package im.cave.ms.abstractServer.channel
+ * @Package im.cave.ms.abstractServer.channelId
  * @date 11/19 16:22
  */
 public class MapleChannel extends AbstractServer {

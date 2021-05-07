@@ -1,12 +1,13 @@
 package im.cave.ms.connection.packet;
 
 import im.cave.ms.client.Account;
-import im.cave.ms.client.MapleClient;
-import im.cave.ms.client.OnlineReward;
+import im.cave.ms.client.character.skill.ForceAtom;
+import im.cave.ms.client.HotTimeReward;
 import im.cave.ms.client.character.ExpIncreaseInfo;
 import im.cave.ms.client.character.MapleCharacter;
 import im.cave.ms.client.character.Option;
 import im.cave.ms.client.character.items.Item;
+import im.cave.ms.client.character.skill.ForceAtomInfo;
 import im.cave.ms.client.character.temp.CharacterTemporaryStat;
 import im.cave.ms.client.character.temp.TemporaryStatManager;
 import im.cave.ms.client.field.FieldEffect;
@@ -14,45 +15,31 @@ import im.cave.ms.client.field.MapleMap;
 import im.cave.ms.client.field.QuickMoveInfo;
 import im.cave.ms.client.field.obj.Drop;
 import im.cave.ms.client.field.obj.Pet;
+import im.cave.ms.client.field.obstacleatom.ObstacleAtomInfo;
+import im.cave.ms.client.field.obstacleatom.ObstacleInRowInfo;
+import im.cave.ms.client.field.obstacleatom.ObstacleRadianInfo;
 import im.cave.ms.client.multiplayer.Express;
 import im.cave.ms.client.multiplayer.friend.Friend;
 import im.cave.ms.client.multiplayer.guilds.Guild;
 import im.cave.ms.client.multiplayer.party.PartyResult;
 import im.cave.ms.client.storage.Trunk;
-import im.cave.ms.connection.netty.InPacket;
 import im.cave.ms.connection.netty.OutPacket;
+import im.cave.ms.connection.netty.Packet;
 import im.cave.ms.connection.packet.opcode.SendOpcode;
 import im.cave.ms.connection.packet.result.ExpressResult;
 import im.cave.ms.connection.packet.result.GuildResult;
-import im.cave.ms.connection.packet.result.OnlineRewardResult;
-import im.cave.ms.connection.server.world.World;
+import im.cave.ms.connection.packet.result.HotTimeRewardResult;
 import im.cave.ms.constants.GameConstants;
-import im.cave.ms.enums.ChatType;
-import im.cave.ms.enums.DimensionalMirror;
-import im.cave.ms.enums.DropEnterType;
-import im.cave.ms.enums.DropLeaveType;
-import im.cave.ms.enums.FriendType;
-import im.cave.ms.enums.InventoryType;
-import im.cave.ms.enums.MapTransferType;
-import im.cave.ms.enums.TrunkOpType;
-import im.cave.ms.enums.UIType;
-import im.cave.ms.tools.DateUtil;
-import im.cave.ms.tools.Position;
-import im.cave.ms.tools.Randomizer;
-import im.cave.ms.tools.StringUtil;
+import im.cave.ms.enums.*;
+import im.cave.ms.tools.*;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.*;
 
 import static im.cave.ms.constants.ServerConstants.NEXON_IP;
 import static im.cave.ms.constants.ServerConstants.ZERO_TIME;
+import static im.cave.ms.enums.DropEnterType.Instant;
 import static im.cave.ms.enums.MessageType.DROP_PICKUP_MESSAGE;
 import static im.cave.ms.enums.MessageType.INC_EXP_MESSAGE;
-import static im.cave.ms.enums.DropEnterType.Instant;
 
 /**
  * @author fair
@@ -71,8 +58,11 @@ public class WorldPacket {
     }
 
     public static OutPacket getWarpToMap(MapleCharacter chr, boolean load, MapleMap to, int spawnPoint, boolean firstLoggedIn) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.SET_MAP.getValue());
+//        if (load) {
+//            return OriginPacket.setMap();
+//        }
+        OutPacket out = new OutPacket(SendOpcode.SET_MAP);
+
         out.writeShort(1);
         out.writeLong(1);
         out.writeInt(chr.getClient().getChannelId());
@@ -89,6 +79,7 @@ public class WorldPacket {
             for (int i = 0; i < 3; i++) {
                 out.writeInt(Randomizer.nextInt());
             }
+//            chr.encode(out, CharMask.All);
             PacketHelper.addCharInfo(out, chr);
             out.write(1);
             out.write(0);
@@ -97,7 +88,7 @@ public class WorldPacket {
             out.writeLong(ZERO_TIME);
             out.writeZeroBytes(16);
         } else {
-            out.write(0); // usingBuffProtector
+            out.write(0); // todo check usingBuffProtector
             out.writeInt(to.getId()); //地图ID
             out.write(spawnPoint);
             out.writeInt(chr.getStats().getHp()); // 角色HP
@@ -113,8 +104,8 @@ public class WorldPacket {
 
         //过图加载怪怪信息
         if (!load) {
-            out.writeInt(360);
-            addUnkData(out, chr);
+            out.writeInt(360); //todo 592
+            addUnkData(out, chr); //怪怪
         } else {
             out.writeLong(4);
         }
@@ -123,8 +114,8 @@ public class WorldPacket {
         out.write(1);
         out.writeInt(-1);
         out.writeLong(0);
-        out.writeInt(999999999);
-        out.writeInt(999999999);
+        out.writeInt(999999999); //townPortal
+        out.writeInt(999999999); //townPortal
         out.writeInt(0);
         out.writeZeroBytes(3);
         out.write(1);
@@ -140,77 +131,6 @@ public class WorldPacket {
         return out;
     }
 
-    public static OutPacket initFamiliar(MapleCharacter chr) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.FAMILIAR.getValue());
-        out.write(7);
-        out.writeInt(chr.getId());
-        out.writeInt(1);
-        out.writeInt(0x9947A4C2);
-        out.writeInt(chr.getAccId());
-        out.writeInt(chr.getId());
-        out.write(1);
-        out.write(1);
-        out.writeZeroBytes(21);
-        out.writeShort(2);
-        out.writeInt(chr.getAccId());
-        out.writeInt(chr.getId());
-        out.writeShort(3);
-        out.writeInt(1);
-        out.writeInt(4);
-        out.writeShort(0);
-        out.writeShort(5);
-        out.writeInt(0);
-        out.writeInt(7);
-        out.writeShort(8);
-        out.writeShort(3);
-        out.writeInt(1);
-        out.writeInt(2);
-        out.writeInt(3);
-        out.writeShort(0);
-        out.writeShort(0x0b);
-        out.writeInt(0x44f9930f);
-        out.write(0x0c);
-        out.writeLong(0);
-        out.writeInt(2);
-        out.writeInt(0x825ad512);
-        out.writeInt(chr.getAccId());
-        out.writeInt(chr.getId());
-        out.write(1);
-        out.write(1);
-        out.writeZeroBytes(21);
-        out.writeShort(2);
-        out.writeInt(chr.getAccId());
-        out.writeInt(chr.getId());
-        out.writeShort(3);
-        out.writeInt(1);
-        out.writeShort(0);
-        out.write(0);
-        out.writeInt(3);
-        out.writeInt(0xb529d96e);
-        out.writeInt(chr.getAccId());
-        out.writeInt(chr.getId());
-        out.write(1);
-        out.write(1);
-        out.writeZeroBytes(21);
-        out.writeShort(2);
-        out.writeInt(chr.getAccId());
-        out.writeInt(chr.getId());
-        out.writeShort(3);
-        out.writeInt(1);
-        byte[] bytes = new byte[]{0x4, 0x5, 0x6, 0x7, 0x8, 0x9,
-                0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x19, 0x1E,
-                0x1F, 0x20, 0x21, 0x24, 0x26, 0x27, 0x28, 0x29};
-        for (byte b : bytes) {
-            out.writeShort(b);
-            if (b == 0x20) {
-                out.writeInt(0);
-            }
-            out.writeInt(0);
-        }
-        out.writeZeroBytes(3);
-        return out;
-    }
 
     public static void addUnkData(OutPacket out, MapleCharacter chr) {
         out.writeInt(1);
@@ -225,6 +145,7 @@ public class WorldPacket {
         out.writeInt(chr.getId());
         out.writeShort(3);
         out.writeInt(1);
+        //out.writeShort(4);
         out.writeInt(4);
         out.writeShort(0);
         out.writeShort(5);
@@ -281,31 +202,35 @@ public class WorldPacket {
 
     public static OutPacket chatMessage(String content, ChatType type) {
         OutPacket out = new OutPacket(SendOpcode.CHAT_MSG);
+
         out.writeShort(type.getVal());
         out.writeMapleAsciiString(content);
+
         return out;
     }
 
-    public static OutPacket debugMsg(String content) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.DEBUG_MSG.getValue());
-        out.writeInt(3); //unk
-        out.writeInt(14); //unk
-        out.writeInt(14); //unk
-        out.writeInt(0); //unk
+    public static OutPacket progressMessageFont(int fontNameType, int fontSize, int fontColorType, int fadeOutDelay, String message) {
+        OutPacket out = new OutPacket(SendOpcode.PROGRESS_MESSAGE_FONT);
+
+        out.writeInt(fontNameType);
+        out.writeInt(fontSize);
+        out.writeInt(fontColorType);
+        out.writeInt(fadeOutDelay);
         out.write(0); //unk
-        out.writeMapleAsciiString(content);
-        return out;
-    }
-
-    public static OutPacket serverNotice(String content) {
-        OutPacket out = new OutPacket(SendOpcode.SERVER_NOTICE);
-
-        out.writeMapleAsciiString(content);
+        out.writeMapleAsciiString(message);
 
         return out;
     }
 
+    public static OutPacket scriptProgressMessage(String content) {
+        OutPacket out = new OutPacket(SendOpcode.SCRIPT_PROGRESS_MESSAGE);
+
+        out.writeMapleAsciiString(content);
+
+        return out;
+    }
+
+    //todo Opcode忘记了
     public static OutPacket fullscreenMessage(String content) {
         OutPacket out = new OutPacket();
         out.write(0x0c);
@@ -322,9 +247,10 @@ public class WorldPacket {
         return dropEnterField(drop, dropEnterType, posFrom, posTo, 0, false);
     }
 
-    public static OutPacket dropEnterField(Drop drop, DropEnterType dropEnterType, Position posFrom, Position posTo, int delay, boolean canBePickByPet) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.DROP_ENTER_FIELD.getValue());
+    public static OutPacket dropEnterField(Drop drop, DropEnterType dropEnterType,
+                                           Position posFrom, Position posTo, int delay, boolean canBePickByPet) {
+        OutPacket out = new OutPacket(SendOpcode.DROP_ENTER_FIELD);
+
         out.writeBool(false);
         out.write(dropEnterType.getVal());
         out.writeInt(drop.getObjectId());
@@ -334,7 +260,7 @@ public class WorldPacket {
         out.writeInt(0);  //rand?
         out.writeInt(!drop.isMoney() ? drop.getItem().getItemId() : drop.getMoney());
         out.writeInt(drop.getOwnerId());
-        out.write(2); // 0 = timeout for non-owner, 1 = timeout for non-owner's party, 2 = FFA, 3 = explosive/FFA
+        out.write(drop.getTimeoutStrategy()); // 0 = timeout for non-owner, 1 = timeout for non-owner's party, 2 = FFA, 3 = explosive/FFA
         out.writePosition(posTo);
         out.writeInt(0); // drop from id
         out.writeZeroBytes(42);
@@ -342,12 +268,13 @@ public class WorldPacket {
             out.writePosition(posFrom);
             out.writeInt(delay); //delay
         }
-        out.write(0); //unk
+        out.write(0);
         if (!drop.isMoney()) {
             out.writeLong(drop.getExpireTime());
         }
         out.writeBool(drop.isCanBePickedUpByPet() && canBePickByPet);
         out.writeZeroBytes(14); //unk
+
         return out;
     }
 
@@ -450,8 +377,8 @@ public class WorldPacket {
     }
 
     //todo 未完成
-    public static OutPacket dojoRank(MapleCharacter chr) {
-        OutPacket out = new OutPacket(SendOpcode.DOJO_RANK);
+    public static OutPacket dojoRankResult(MapleCharacter chr) {
+        OutPacket out = new OutPacket(SendOpcode.DOJO_RANK_RESULT);
         out.write(0);
         out.writeInt(chr.getJob());
         return out;
@@ -565,20 +492,20 @@ public class WorldPacket {
      */
 
 
-    public static OutPacket eventMessage(String msg, int type, int duration) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.EVENT_MESSAGE.getValue());
-        out.writeMapleAsciiString(msg);
-        out.writeInt(type); //type
+    public static OutPacket weatherEffectNotice(WeatherEffNoticeType type, String text, int duration) {
+        OutPacket out = new OutPacket(SendOpcode.WEATHER_EFFECT_NOTICE);
+
+        out.writeMapleAsciiString(text);
+        out.writeInt(type.getVal()); //type
         out.writeInt(duration); //duration
-        out.write(1); //unk  !=
+        out.write(1); //Forced Notice
+
         return out;
     }
 
     public static OutPacket userEnterMap(MapleCharacter chr) {
-        OutPacket out = new OutPacket();
+        OutPacket out = new OutPacket(SendOpcode.USER_ENTER_FIELD);
         TemporaryStatManager tsm = chr.getTemporaryStatManager();
-        out.writeShort(SendOpcode.USER_ENTER_FIELD.getValue());
         out.writeLong(DateUtil.getFileTime(System.currentTimeMillis()));
         out.writeInt(chr.getId());
         out.writeInt(chr.getLevel());
@@ -593,13 +520,16 @@ public class WorldPacket {
         out.write(chr.getGender());
         out.writeInt(chr.getFame());
         out.writeZeroBytes(13); //todo
+
+        //大问题
         Map<CharacterTemporaryStat, List<Option>> spawnBuffs = CharacterTemporaryStat.getSpawnBuffs();
         spawnBuffs.putAll(tsm.getCurrentStats());
         tsm.encodeForRemote(out, spawnBuffs);
+
         out.writeShort(chr.getJob());
         out.writeShort(chr.getSubJob());
         out.writeInt(chr.getTotalChuc()); //星之力
-        out.writeInt(0);
+        out.writeInt(0); //ARC
         chr.getCharLook().encode(out);
         out.writeInt(0); // int or short
         out.write(0xFF);
@@ -616,10 +546,27 @@ public class WorldPacket {
             out.write(-1); // unk
         }
         out.writeZeroBytes(14); //椅子
+        //charId int
+        //0 int
+        //10 byte
+        //01 byte
+        // CE 9D E1 00 int
+        // C7 44 97 00
         out.writePosition(chr.getPosition());
         out.write(chr.getMoveAction());
         out.writeShort(chr.getFoothold());
-        out.write(0);
+        boolean hasPortableChairMsg = chr.getPortableChairMsg() != null;
+        out.writeBool(hasPortableChairMsg); //hasPortableChairMsg
+        if (hasPortableChairMsg) {
+            out.writeMapleAsciiString(chr.getPortableChairMsg());
+            out.writeMapleAsciiString(chr.getName());
+            out.writeMapleAsciiString(chr.getPortableChairMsg());
+        }
+        /*
+            string:msg
+            string:name
+            string:msg
+         */
         for (Pet pet : chr.getPets()) {
             if (pet.getId() == 0) {
                 continue;
@@ -628,6 +575,7 @@ public class WorldPacket {
             out.writeInt(pet.getIdx());
             pet.encode(out);
         }
+
         out.write(0);
         out.write(0);
         out.write(1);
@@ -636,15 +584,17 @@ public class WorldPacket {
             out.write(-1);
         }
         out.writeInt(0);
-        out.write(0);
-        out.writeZeroBytes(20);
+        out.write(0);//也可能是1
+        out.writeZeroBytes(15);
         out.write(1);
         out.write(1);
         out.write(0);
         out.write(0);
+
         out.writeInt(1051291);
         out.writeZeroBytes(29);
-        out.writeMapleAsciiString(chr.getWorld() + "-" + StringUtil.getLeftPaddedStr(String.valueOf(chr.getId()), '0', 6));
+        //显示不出来
+        out.writeMapleAsciiString(chr.getWorldId() + "-" + StringUtil.getLeftPaddedStr(String.valueOf(chr.getId()), '0', 6));
         out.writeInt(0); // 如果是5 则有怪怪  应该是MASK
 
         return out;
@@ -663,9 +613,10 @@ public class WorldPacket {
     }
 
     public static OutPacket startBattleAnalysis() {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.BATTLE_ANALYSIS.getValue());
+        OutPacket out = new OutPacket(SendOpcode.BATTLE_ANALYSIS);
+
         out.write(1);
+
         return out;
     }
 
@@ -709,8 +660,9 @@ public class WorldPacket {
         return out;
     }
 
-    public static OutPacket recommendPlayers(List<MapleCharacter> players) {
-        OutPacket out = new OutPacket(SendOpcode.RECOMMEND_PLAYER);
+    //组队推荐玩家
+    public static OutPacket partyMemberCandidateResult(List<MapleCharacter> players) {
+        OutPacket out = new OutPacket(SendOpcode.PARTY_MEMBER_CANDIDATE_RESULT);
         out.write(players.size());
         for (MapleCharacter player : players) {
             out.writeInt(player.getId());
@@ -818,7 +770,7 @@ public class WorldPacket {
                 out.writeInt(chr.getId()); //friendId
                 out.writeInt(chr.getAccId()); //accId
                 out.write(0); //
-                out.writeInt(chr.getChannel()); //20商城 -1离线
+                out.writeInt(chr.getChannelId()); //20商城 -1离线
                 out.write(1); //是否是账号好友
                 out.write(1);
                 out.writeMapleAsciiString(chr.getName()); //账号好友才有
@@ -837,9 +789,11 @@ public class WorldPacket {
 
     public static OutPacket receiveHP(MapleCharacter chr) {
         OutPacket out = new OutPacket(SendOpcode.REMOTE_RECEIVE_HP);
+
         out.writeInt(chr.getId());
         out.writeInt(chr.getHp());
         out.writeInt(chr.getMaxHP());
+
         return out;
     }
 
@@ -877,19 +831,19 @@ public class WorldPacket {
         return out;
     }
 
-    public static OutPacket onlineRewardResult(OnlineRewardResult result) {
-        OutPacket out = new OutPacket(SendOpcode.ONLINE_REWARD_RESULT);
+    public static OutPacket hotTimeRewardResult(HotTimeRewardResult result) {
+        OutPacket out = new OutPacket(SendOpcode.HOTTIME_REWARD_RESULT);
         out.write(result.getType().getVal());
         switch (result.getType()) {
             case LIST:
-                List<OnlineReward> rewards = result.getRewards();
+                List<HotTimeReward> rewards = result.getRewards();
                 out.writeInt(rewards.size());
-                for (OnlineReward reward : rewards) {
+                for (HotTimeReward reward : rewards) {
                     reward.encode(out);
                 }
                 break;
             case GET_MAPLE_POINT:
-                OnlineReward reward = result.getReward();
+                HotTimeReward reward = result.getReward();
                 out.writeInt(reward.getSort());
                 out.writeInt(reward.getMaplePoint());
                 out.writeInt(0);
@@ -944,8 +898,8 @@ public class WorldPacket {
         return out;
     }
 
-    public static OutPacket guildRank(List<Guild> ggpWeaklyRank, List<Guild> captureTheFlagGameRank, List<Guild> undergroundWaterwayRank) {
-        OutPacket out = new OutPacket(SendOpcode.GUILD_RANK);
+    public static OutPacket guildContentResult(List<Guild> ggpWeaklyRank, List<Guild> captureTheFlagGameRank, List<Guild> undergroundWaterwayRank) {
+        OutPacket out = new OutPacket(SendOpcode.GUILD_CONTENT_RESULT);
 
         out.writeBool(true);
         out.writeInt(ggpWeaklyRank.size());
@@ -971,6 +925,103 @@ public class WorldPacket {
             out.writeLong(DateUtil.getFileTime(System.currentTimeMillis()));
             out.writeMapleAsciiString(guild.getName());
         }
+
+        return out;
+    }
+
+    //todo move to CField
+    public static OutPacket blowWeather(int itemId, String message) {
+        return null;
+    }
+
+    public static OutPacket hourChange() {
+        OutPacket out = new OutPacket(SendOpcode.HOUR_CHANGE);
+
+        out.writeShort(5); //unk
+        out.writeShort(DateUtil.now().getHour());
+
+        return out;
+    }
+
+    public static OutPacket miniMapOnOff(boolean opt) {
+        OutPacket out = new OutPacket(SendOpcode.MINIMAP_ON_OFF);
+
+        out.writeBool(opt);
+
+        return out;
+
+    }
+
+    public static OutPacket createForceAtom(boolean byMob, int userOwner, int targetID, int forceAtomType,
+                                            boolean toMob, int targets, int skillID,
+                                            ForceAtomInfo fai, Rect rect, int arriveDir, int arriveRange,
+                                            Position forcedTargetPos, int bulletID, Position pos) {
+
+        return createForceAtom(byMob, userOwner, targetID, ForceAtomEnum.getByVal(forceAtomType), toMob, targets, skillID, fai, rect, arriveDir, arriveRange, forcedTargetPos, bulletID, pos);
+    }
+
+    public static OutPacket createForceAtom(boolean byMob, int userOwner, int targetID, ForceAtomEnum forceAtomType, boolean toMob,
+                                            int targets, int skillID, ForceAtomInfo fai, Rect rect, int arriveDir, int arriveRange,
+                                            Position forcedTargetPos, int bulletID, Position pos) {
+        List<Integer> integers = new ArrayList<>();
+        integers.add(targets);
+        List<ForceAtomInfo> forceAtomInfos = new ArrayList<>();
+        forceAtomInfos.add(fai);
+        return createForceAtom(byMob, userOwner, targetID, forceAtomType, toMob, integers, skillID, forceAtomInfos,
+                rect, arriveDir, arriveRange, forcedTargetPos, bulletID, pos);
+    }
+
+    public static OutPacket createForceAtom(boolean byMob, int userOwner, int charID, ForceAtomEnum forceAtomType, boolean toMob,
+                                            List<Integer> targets, int skillID, List<ForceAtomInfo> faiList, Rect rect, int arriveDir, int arriveRange,
+                                            Position forcedTargetPos, int bulletID, Position pos) {
+        return createForceAtom(new ForceAtom(byMob, userOwner, charID, forceAtomType, toMob, targets, skillID, faiList, rect, arriveDir, arriveRange, forcedTargetPos, bulletID, pos));
+    }
+
+    public static OutPacket createForceAtom(ForceAtom fa) {
+        OutPacket out = new OutPacket(SendOpcode.CREATE_FORCE_ATOM);
+        fa.encode(out);
+        return out;
+    }
+
+    public static OutPacket createObstacle(ObstacleAtomCreateType oact, ObstacleInRowInfo oiri, ObstacleRadianInfo ori,
+                                           Set<ObstacleAtomInfo> atomInfos) {
+        OutPacket out = new OutPacket(SendOpcode.CREATE_OBSTACLE);
+        out.writeInt(0); // ? gets used in 1 function, which forwards it to another, which does nothing with it
+        out.writeInt(atomInfos.size());
+        out.write(oact.getVal());
+        if (oact == ObstacleAtomCreateType.IN_ROW) {
+            oiri.encode(out);
+        } else if (oact == ObstacleAtomCreateType.RADIAL) {
+            ori.encode(out);
+        }
+        for (ObstacleAtomInfo atomInfo : atomInfos) {
+            out.writeBool(true); // false -> no encode
+            atomInfo.encode(out);
+            if (oact == ObstacleAtomCreateType.DIAGONAL) {
+                atomInfo.getObtacleDiagonalInfo().encode(out);
+            }
+        }
+
+        return out;
+    }
+
+    /*
+        type:2 家族
+     */
+    public static OutPacket notifyLevelUp(int type, int level, String name) {
+        OutPacket out = new OutPacket(SendOpcode.NOTIFY_LEVEL_UP);
+
+        out.write(type);
+        out.writeInt(level);
+        out.writeMapleAsciiString(name);
+
+        return out;
+    }
+
+    public static Packet setPassenserRequest(int requesterCharId) {
+        OutPacket out = new OutPacket(SendOpcode.SET_PASSENSER_REQUEST);
+
+        out.writeInt(requesterCharId);
 
         return out;
     }

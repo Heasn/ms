@@ -57,10 +57,13 @@ public class LoginServerHandler extends AbstractServerHandler {
                 c.announce(LoginPacket.sendStart());
                 break;
             case CLIENT_ERROR:
-                c.close();
+                log.error("Error");
                 break;
             case AFTER_CREATE_CHAR:
                 CharOperationHandler.handleAfterCreateChar(in, c);
+                break;
+            case ORDER_CHARACTERS:
+                CharOperationHandler.handleOrderCharacter(in, c);
                 break;
             case SDO_LOGIN_REQUEST:
                 OfficialLoginHandler.handlePacket(c, in);
@@ -70,6 +73,8 @@ public class LoginServerHandler extends AbstractServerHandler {
                 break;
             case CHARLIST_REQUEST:
                 CharlistRequestHandler.handlePacket(in, c);
+                break;
+            case CLIENT_LOAD_DONE:
                 break;
             case CHAR_SELECTED:
                 CharOperationHandler.handleSelectChar(in, c);
@@ -98,7 +103,7 @@ public class LoginServerHandler extends AbstractServerHandler {
             case ERROR_PACKET:
                 ErrorPacketHandler.handlePacket(in);
                 break;
-            case OPEN_CREATE_CHAR_LAYOUT:
+            case LP_OPEN_CREATE_CHAR_LAYOUT:
             case USER_TRANSFER_CHANNEL_REQUEST:
                 c.announce(LoginPacket.getOpenCreateChar());
                 break;

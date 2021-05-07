@@ -35,6 +35,6 @@ public class Config {
 
     public static void reload() {
         serverConfig = (ServerConfig) loadConfig("server-config.yml", ServerConfig.class);
-        worldConfig = (WorldConfig) loadConfig("world-config.yml", WorldConfig.class);
+        worldConfig = (WorldConfig) loadConfig("worldId-config.yml", WorldConfig.class);
     }
 }

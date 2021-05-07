@@ -3,6 +3,8 @@ package im.cave.ms.connection.server.world;
 import im.cave.ms.client.character.MapleCharacter;
 import im.cave.ms.client.multiplayer.guilds.Guild;
 import im.cave.ms.client.multiplayer.party.Party;
+import im.cave.ms.client.multiplayer.party.PartyMember;
+import im.cave.ms.client.multiplayer.party.PartyQuest;
 import im.cave.ms.configs.Config;
 import im.cave.ms.configs.WorldConfig;
 import im.cave.ms.connection.db.DataBaseManager;
@@ -10,6 +12,7 @@ import im.cave.ms.connection.server.AbstractServer;
 import im.cave.ms.connection.server.auction.Auction;
 import im.cave.ms.connection.server.cashshop.CashShopServer;
 import im.cave.ms.connection.server.channel.MapleChannel;
+import im.cave.ms.enums.PartyQuestType;
 import im.cave.ms.tools.StringUtil;
 import im.cave.ms.tools.Util;
 
@@ -21,27 +24,39 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * @author fair
  * @version V1.0
- * @Package im.cave.ms.abstractServer.world
+ * @Package im.cave.ms.abstractServer.worldId
  * @date 11/19 16:22
  */
 public class World {
     private int id;
     private List<MapleChannel> channels = new ArrayList<>();
-    private final Map<Integer, Party> parties = new HashMap<>(); //组队
-    private final Map<Integer, Guild> guilds = new HashMap<>(); //家族
-
+    private final Map<Integer, Party> parties = new HashMap<>();
+    private final Map<Integer, Guild> guilds = new HashMap<>();
+    private final Set<PartyQuest> partyQuests = new HashSet<>();
+    private String title;
     private Integer partyCounter = 1;
-    private CashShopServer cashShopServer; //商城
-    private Auction auction; //拍卖行
+    private CashShopServer cashShopServer;
+    private Auction auction;
     private String eventMessage;
+    private int dropRate;
+    private int mesoRate;
+    private int expRate;
 
     public World(int id, String eventMessage) {
         this.id = id;
         this.eventMessage = eventMessage;
+        this.title = String.format("World-%d", id);
+    }
+
+    public World(int id, String eventMessage, String title) {
+        this.id = id;
+        this.eventMessage = eventMessage;
+        this.title = title;
     }
 
     public void setEventMessage(String eventMessage) {
@@ -88,6 +103,10 @@ public class World {
     public boolean init() {
         try {
             WorldConfig.WorldInfo info = Config.worldConfig.getWorldInfo(id);
+            setDropRate(info.drop_rate);
+            setExpRate(info.exp_rate);
+            setMesoRate(info.meso_rate);
+            setEventMessage(info.event_message);
             for (int i = 0; i < info.channels; i++) {
                 MapleChannel channel = new MapleChannel(id, i);
                 channels.add(channel);
@@ -191,5 +210,56 @@ public class World {
 
     public Auction getAuction() {
         return auction;
+    }
+
+    public void addPartyQuest(PartyQuest partyQuest) {
+        partyQuests.add(partyQuest);
+    }
+
+    public boolean hasInProgress(int channel, PartyQuestType type) {
+        for (PartyQuest partyQuest : partyQuests) {
+            if (partyQuest.getChannel() == channel &&
+                    partyQuest.getType() == type) {
+                List<PartyMember> memberInProgress = partyQuest.getParty().getOnlineMembers().stream().filter(m -> m.getPartyQuest() != null).collect(Collectors.toList());
+                return memberInProgress.size() != 0;
+            }
+        }
+        return false;
+    }
+
+    public void removePQ(PartyQuest partyQuest) {
+        partyQuests.remove(partyQuest);
+    }
+
+    public int getDropRate() {
+        return dropRate;
+    }
+
+    public void setDropRate(int dropRate) {
+        this.dropRate = dropRate;
+    }
+
+    public int getMesoRate() {
+        return mesoRate;
+    }
+
+    public void setMesoRate(int mesoRate) {
+        this.mesoRate = mesoRate;
+    }
+
+    public int getExpRate() {
+        return expRate;
+    }
+
+    public void setExpRate(int expRate) {
+        this.expRate = expRate;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
     }
 }

@@ -7,22 +7,9 @@ import im.cave.ms.client.multiplayer.guilds.GuildMember;
 import im.cave.ms.client.multiplayer.guilds.GuildSkill;
 import im.cave.ms.connection.netty.OutPacket;
 import im.cave.ms.enums.GuildType;
+import im.cave.ms.tools.DateUtil;
 
-import static im.cave.ms.enums.GuildType.Res_ChangeSetting_Done;
-import static im.cave.ms.enums.GuildType.Res_IncMaxMemberNum_Done;
-import static im.cave.ms.enums.GuildType.Res_IncPoint_Done;
-import static im.cave.ms.enums.GuildType.Res_InputGuildNameRequest;
-import static im.cave.ms.enums.GuildType.Res_LoadGuild_Done;
-import static im.cave.ms.enums.GuildType.Res_Rank;
-import static im.cave.ms.enums.GuildType.Res_RemoveGuild_Done;
-import static im.cave.ms.enums.GuildType.Res_SetGradeNameAndRight_Done;
-import static im.cave.ms.enums.GuildType.Res_SetGradeName_Done;
-import static im.cave.ms.enums.GuildType.Res_SetGradeRight_Done;
-import static im.cave.ms.enums.GuildType.Res_SetMark_Done;
-import static im.cave.ms.enums.GuildType.Res_SetMemberCommitment_Done;
-import static im.cave.ms.enums.GuildType.Res_SetMemberGrade_Done;
-import static im.cave.ms.enums.GuildType.Res_SetNotice_Done;
-import static im.cave.ms.enums.GuildType.Res_SetSkill_Done;
+import static im.cave.ms.enums.GuildType.*;
 
 public class GuildResult {
 
@@ -134,6 +121,14 @@ public class GuildResult {
                 out.writeInt(guild.getId());
                 out.write(1); //控制是否显示？
                 break;
+            case Res_NotifyLoginOrLogout:
+                out.writeInt(guild.getId());
+                out.writeInt(member.getCharId());
+                out.writeBool(member.isOnline()); //待測試
+                if (!member.isOnline()) {
+                    out.writeLong(DateUtil.getFileTime(System.currentTimeMillis()));
+                }
+                out.writeBool(member.isOnline()); //待測試
         }
     }
 
@@ -231,6 +226,20 @@ public class GuildResult {
     public static GuildResult guildRemoved(Guild guild) {
         GuildResult gri = new GuildResult(Res_RemoveGuild_Done);
         gri.guild = guild;
+        return gri;
+    }
+
+    public static GuildResult notifyLoginOrLogout(GuildMember member) {
+        GuildResult gri = new GuildResult(Res_NotifyLoginOrLogout);
+        gri.guild = member.getChr().getGuild();
+        gri.member = member;
+        return gri;
+    }
+
+    public static GuildResult changeLevelOrJob(Guild guild, GuildMember member) {
+        GuildResult gri = new GuildResult(Res_ChangeLevelOrJob);
+        gri.guild = guild;
+        gri.member = member;
         return gri;
     }
 

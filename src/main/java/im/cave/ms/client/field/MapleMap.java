@@ -1,17 +1,17 @@
 package im.cave.ms.client.field;
 
-import im.cave.ms.client.character.Clock;
+import im.cave.ms.client.Clock;
 import im.cave.ms.client.character.MapleCharacter;
 import im.cave.ms.client.character.items.Item;
+import im.cave.ms.client.character.temp.TemporaryStatManager;
 import im.cave.ms.client.field.obj.Drop;
-import im.cave.ms.client.field.obj.npc.Npc;
-import im.cave.ms.connection.netty.Packet;
-import im.cave.ms.provider.info.DropInfo;
 import im.cave.ms.client.field.obj.MapleMapObj;
 import im.cave.ms.client.field.obj.Summon;
 import im.cave.ms.client.field.obj.mob.Mob;
 import im.cave.ms.client.field.obj.mob.MobGen;
+import im.cave.ms.client.field.obj.npc.Npc;
 import im.cave.ms.connection.netty.OutPacket;
+import im.cave.ms.connection.netty.Packet;
 import im.cave.ms.connection.packet.UserRemote;
 import im.cave.ms.connection.packet.WorldPacket;
 import im.cave.ms.connection.server.service.EventManager;
@@ -22,6 +22,8 @@ import im.cave.ms.enums.DropLeaveType;
 import im.cave.ms.enums.FieldOption;
 import im.cave.ms.enums.FieldType;
 import im.cave.ms.provider.data.ItemData;
+import im.cave.ms.provider.data.MobData;
+import im.cave.ms.provider.info.DropInfo;
 import im.cave.ms.provider.info.ItemInfo;
 import im.cave.ms.scripting.map.MapScriptManager;
 import im.cave.ms.tools.DateUtil;
@@ -33,13 +35,7 @@ import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledFuture;
@@ -86,8 +82,8 @@ public class MapleMap {
                   2.角色
      */
     private Clock clock;
-
-    private Set<FieldEffect> fieldEffects;
+    private List<Portal> disabledPortals = new ArrayList<>(); //禁用的传送门
+    private Set<FieldEffect> fieldEffects = new HashSet<>();
 
     public MapleMap(int id, int world, int channel) {
         this.id = id;
@@ -118,18 +114,24 @@ public class MapleMap {
             characters.add(chr);
             chr.setMapId(id);
             MapScriptManager msm = MapScriptManager.getInstance();
-            int charSize = characters.size();
-            if (charSize == 1) {
-                if (onFirstUserEnter.length() != 0) {
-                    msm.runMapScript(chr.getClient(), "onFirstUserEnter/" + onFirstUserEnter, true);
+            if (!isUserFirstEnter()) {
+                if (hasUserFirstEnterScript()) {
+                    chr.chatMessage("First enter script!");
+                    msm.runMapScript(chr.getClient(), "onFirstUserEnter/" + onFirstUserEnter);
+                    setUserFirstEnter(true);
                 }
             }
             if (onUserEnter.length() != 0) {
-                msm.runMapScript(chr.getClient(), "onUserEnter/" + onUserEnter, false);
+                msm.runMapScript(chr.getClient(), "onUserEnter/" + onUserEnter);
             }
             broadcastMessage(chr, WorldPacket.userEnterMap(chr), false);
         }
     }
+
+    private boolean hasUserFirstEnterScript() {
+        return getOnFirstUserEnter() != null && !getOnFirstUserEnter().equalsIgnoreCase("");
+    }
+
 
     public void sendMapObject() {
         for (MapleCharacter character : characters) {
@@ -190,7 +192,7 @@ public class MapleMap {
     public Portal getPortal(byte portal) {
         return portals.stream()
                 .filter(p -> p.getId() == portal)
-                .findAny().orElse(null);
+                .findAny().orElse(getSpawnPortal());
     }
 
     public void addObj(MapleMapObj obj) {
@@ -280,6 +282,11 @@ public class MapleMap {
         objs.remove(obj.getObjectId());
         removeSchedule(obj, schedule);
     }
+
+    public void removeObj(MapleMapObj obj) {
+        removeObj(obj.getObjectId(), false);
+    }
+
 
     private void removeSchedule(MapleMapObj obj, boolean schedule) {
         if (!getObjScheduledFutures().containsKey(obj)) {
@@ -466,6 +473,10 @@ public class MapleMap {
         return getPortals().stream().filter(portal -> portal.getName().equalsIgnoreCase("sp")).collect(Collectors.toList());
     }
 
+    public Portal getSpawnPortal() {
+        return Util.findWithPred(getPortals(), portal -> portal.getName().equalsIgnoreCase("sp"));
+    }
+
     public void spawnSummon(Summon summon) {
         Summon oldSummon = (Summon) getObjs().values().stream()
                 .filter(s -> s instanceof Summon &&
@@ -536,5 +547,47 @@ public class MapleMap {
 
     public Npc getNpcById(int npcId) {
         return Util.findWithPred(getNpcs(), npc -> npc.getTemplateId() == npcId);
+    }
+
+    public void disablePortal(String portalName) {
+        Portal portal = getPortal(portalName);
+        disabledPortals.add(portal);
+    }
+
+    public void enablePortal(String portalName) {
+        Portal portal = getPortal(portalName);
+        disabledPortals.remove(portal);
+    }
+
+    public void addEffectAndBroadcast(FieldEffect effect) {
+        fieldEffects.add(effect);
+        broadcastMessage(WorldPacket.fieldEffect(effect));
+    }
+
+    public void spawnMob(int mobId, int x, int y) {
+        Mob mob = MobData.getMobDeepCopyById(mobId);
+        mob.setX(x);
+        mob.setY(y);
+        addObj(mob);
+    }
+
+    public Set<AffectedArea> getAffectedAreas() {
+        return getLifesByClass(AffectedArea.class);
+    }
+
+    public Set<FieldAttackObj> getFieldAttackObjects() {
+        return getLifesByClass(FieldAttackObj.class);
+    }
+
+    public void checkCharInAffectedAreas(MapleCharacter chr) {
+        TemporaryStatManager tsm = chr.getTemporaryStatManager();
+        for (AffectedArea aa : getAffectedAreas()) {
+            boolean isInsideAA = aa.getRect().hasPositionInside(chr.getPosition());
+            if (isInsideAA) {
+                aa.handleCharInside(chr);
+            } else if (tsm.hasAffectedArea(aa)) {
+                tsm.removeAffectedArea(aa);
+            }
+        }
     }
 }

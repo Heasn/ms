@@ -44,7 +44,7 @@ public class LoginPacket {
     public static OutPacket getHello(MapleClient c, ServerType type) {
         OutPacket out = new OutPacket();
         if (type == LOGIN) {
-            out.writeShort(0x1E);
+            out.writeShort(0x1F); //Packet Size
             for (int i = 0; i < 2; i++) {
                 out.writeShort(VERSION);
                 out.writeMapleAsciiString(PATH);
@@ -52,8 +52,9 @@ public class LoginPacket {
                 out.writeInt(c.getSendIv());
                 out.writeShort(4);
             }
+            out.write(0); //179新增
         } else {
-            out.writeShort(0x0E);
+            out.writeShort(0x0E); //Packet Size
             out.writeShort(VERSION);
             out.writeMapleAsciiString(PATH);
             out.writeInt(c.getRecvIv());
@@ -121,25 +122,28 @@ public class LoginPacket {
         return out;
     }
 
-    public static List<OutPacket> serverList() {
+    public static List<OutPacket> worldInformation() {
         Server server = Server.getInstance();
         List<World> worlds = server.getWorlds();
         List<OutPacket> serverList = new ArrayList<>();
         for (World world : worlds) {
             OutPacket out = new OutPacket();
-            out.writeShort(SendOpcode.SERVERLIST.getValue());
+            out.writeShort(SendOpcode.WORLD_INFORMATION.getValue());
             out.writeShort(world.getId());
-            out.writeMapleAsciiString("World-" + world.getId());
+            out.writeMapleAsciiString(world.getTitle());
             out.writeZeroBytes(8);
             out.writeShort(512);
+
             out.writeMapleAsciiString(world.getEventMessage());
             out.write(world.getChannelsSize());
+
             out.writeInt(500);
-            List<MapleChannel> worldChannels = world.getChannels();
-            for (MapleChannel ch : worldChannels) {
-                out.writeMapleAsciiString("World-" + world.getId() + "-" + ch.getChannelId());
+
+            List<MapleChannel> channels = world.getChannels();
+            for (MapleChannel ch : channels) {
+                out.writeMapleAsciiString(String.format("%s-%d", world.getTitle(), ch.getChannelId()));
                 out.writeInt(ch.getChannelCapacity());
-                out.write(world.getId());
+                out.write(0);
                 out.writeShort(ch.getChannelId());
             }
             out.writeZeroBytes(12);
@@ -149,9 +153,9 @@ public class LoginPacket {
 
     }
 
-    public static OutPacket serverListEnd() {
+    public static OutPacket worldInformationEnd() {
         OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.SERVERLIST.getValue());
+        out.writeShort(SendOpcode.WORLD_INFORMATION.getValue());
         out.writeShort(-1);
         out.writeLong(DateUtil.getFileTime(System.currentTimeMillis()));
         out.writeLong(0);
@@ -159,12 +163,13 @@ public class LoginPacket {
         return out;
     }
 
-    public static OutPacket serverStatus(int worldId) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.SERVERSTATUS.getValue());
+    public static OutPacket sendSelectWorld(int worldId) {
+        OutPacket out = new OutPacket(SendOpcode.SELECT_WORLD_BUTTON);
+
         out.write(0);
         out.writeInt(worldId);
         out.writeInt(worldId);
+
         return out;
     }
 
@@ -176,19 +181,19 @@ public class LoginPacket {
         return out;
     }
 
-    public static OutPacket charactersList(MapleClient c, List<MapleCharacter> characters, int status) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.CHARLIST.getValue());
+    public static OutPacket selectWorldResult(MapleClient c, List<MapleCharacter> characters, int status) {
+        OutPacket out = new OutPacket(SendOpcode.SELECT_WORLD_RESULT);
+
         out.write(status);
         out.writeMapleAsciiString("normal");
         out.writeMapleAsciiString("normal");
         out.writeZeroBytes(6);
         List<MapleCharacter> deletedChars = characters.stream().filter(chr -> chr.getDeleteTime() != 0).collect(Collectors.toList());
         out.writeInt(deletedChars.size());
-        out.writeLong(DateUtil.getFileTime(System.currentTimeMillis()));
+        out.writeLong(DateUtil.getFileTime(System.currentTimeMillis())); //当前时间
         for (MapleCharacter deletedChar : deletedChars) {
             out.writeInt(deletedChar.getId());
-            out.writeLong(deletedChar.getDeleteTime());
+            out.writeLong(deletedChar.getDeleteTime()); //被删除的时间
         }
         out.write(0);
         out.writeInt(characters.size());
@@ -204,22 +209,22 @@ public class LoginPacket {
         out.writeInt(0); // buying char slots
         out.writeInt(-1); // nEventNewCharJob
         out.writeReversedLong(DateUtil.getFileTime(System.currentTimeMillis()));
-        out.write(0); //
-        out.write(1);
         out.write(0);
-        out.writeZeroBytes(8);
-        out.writeInt(327680);
-        out.writeInt(553713664); // 00 00 01 21
+        out.write(0);
+        out.write(0);
+        out.writeZeroBytes(16);
+        out.writeInt(-1308557312);
         for (JobConstants.LoginJob job : JobConstants.LoginJob.values()) {
             out.write(Config.serverConfig.CLOSED_JOBS.contains(job.getBeginJob().getJob()) ? 0 : job.getFlag());
             out.writeShort(1);
         }
+
         return out;
     }
 
     public static OutPacket selectCharacterResult(LoginType loginType, byte errorCode, int port, int charId) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.SELECT_CHARACTER_RESULT.getValue());
+        OutPacket out = new OutPacket(SendOpcode.SELECT_CHARACTER_RESULT);
+
         out.write(loginType.getValue());
         out.write(errorCode);
         if (loginType.equals(LoginType.Success)) {
@@ -233,6 +238,7 @@ public class LoginPacket {
             out.writeShort(5120);
             out.writeLong(1000);
         }
+
         return out;
     }
 
@@ -241,7 +247,7 @@ public class LoginPacket {
         if (type == LOGIN) {
             out.writeShort(SendOpcode.PING.getValue());
         } else {
-            out.writeShort(SendOpcode.CPING.getValue());
+            out.writeShort(SendOpcode.C_PING.getValue());
         }
         return out;
     }
@@ -263,14 +269,14 @@ public class LoginPacket {
         }
         String key = new String(ss);
         LoginServer.getInstance().putLoginAuthKey(key, c.getAccount().getAccount(), c.getChannelId());
-        out.writeShort(SendOpcode.CHANGE_CHAR_KEY.getValue());
+        out.writeShort(SendOpcode.RELOGIN_AUTH_KEY.getValue());
         out.writeMapleAsciiString(key);
         return out;
     }
 
     public static OutPacket authSuccess(MapleClient c) {
         OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.AUTH_SUCCESS.getValue());
+        out.writeShort(SendOpcode.ACCOUNT_INFO_RESULT.getValue());
         out.write(0);//succeed
         out.writeInt(c.getAccount().getId());
         out.write(0);
@@ -295,9 +301,9 @@ public class LoginPacket {
         return out;
     }
 
-    public static OutPacket deleteTime(int charId) {
+    public static OutPacket reservedDeleteCharacterResult(int charId) {
         OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.DELETE_CHAR_TIME.getValue());
+        out.writeShort(SendOpcode.RESERVED_DELETE_CHARACTER_RESULT.getValue());
         out.writeInt(charId);
         out.write(0);
         long deleteTime = LocalDateTime.now().plusDays(3).toInstant(ZoneOffset.of("+8")).toEpochMilli();
@@ -306,9 +312,9 @@ public class LoginPacket {
         return out;
     }
 
-    public static OutPacket cancelDeleteChar(int charId) {
+    public static OutPacket reservedDeleteCharacterCancelResult(int charId) {
         OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.CANCEL_DELETE_CHAR.getValue());
+        out.writeShort(SendOpcode.RESERVED_DELETE_CHARACTER_CANCEL_RESULT.getValue());
         out.writeInt(charId);
         out.write(0);
         return out;

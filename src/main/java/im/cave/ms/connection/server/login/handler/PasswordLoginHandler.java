@@ -25,7 +25,8 @@ import java.net.InetSocketAddress;
  * @date 11/20 21:38
  */
 public class PasswordLoginHandler {
-    private static int count = 0;
+    private static int count = 0; //todo 记录登录账号密码尝试册数
+    //todo 记录异地登陆踢出在线账号功能
     private static final Logger log = LoggerFactory.getLogger(PasswordLoginHandler.class);
 
     public static void handlePacket(MapleClient c, InPacket in) {
@@ -55,11 +56,11 @@ public class PasswordLoginHandler {
         if (loginResult == LoginType.Success) {
             c.announce(LoginPacket.loginResult(c, loginResult));
             c.announce(LoginPacket.serverListBg());
-            for (OutPacket serverInfo : LoginPacket.serverList()) {
+            for (OutPacket serverInfo : LoginPacket.worldInformation()) {
                 c.announce(serverInfo);
             }
             count++;
-            c.announce(LoginPacket.serverListEnd());
+            c.announce(LoginPacket.worldInformationEnd());
         } else if (loginResult == LoginType.NotRegistered && Config.serverConfig.AUTOMATIC_REGISTER) {
             Account account = Account.createAccount(username, BCrypt.hashpw(password, BCrypt.gensalt(ServerConstants.BCRYPT_ITERATIONS)));
             account.save();
@@ -69,10 +70,10 @@ public class PasswordLoginHandler {
             c.setLoginStatus(LoginStatus.LOGGEDIN);
             c.announce(LoginPacket.loginResult(c, LoginType.Success));
             c.announce(LoginPacket.serverListBg());
-            for (OutPacket serverInfo : LoginPacket.serverList()) {
+            for (OutPacket serverInfo : LoginPacket.worldInformation()) {
                 c.announce(serverInfo);
             }
-            c.announce(LoginPacket.serverListEnd());
+            c.announce(LoginPacket.worldInformationEnd());
         } else {
             c.announce(LoginPacket.loginResult(c, loginResult));
         }

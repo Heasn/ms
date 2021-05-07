@@ -1,33 +1,20 @@
 package im.cave.ms.client.character;
 
-import im.cave.ms.client.Account;
-import im.cave.ms.client.MapleClient;
-import im.cave.ms.client.OnlineReward;
-import im.cave.ms.client.Record;
-import im.cave.ms.client.RecordManager;
-import im.cave.ms.client.character.items.Equip;
-import im.cave.ms.client.character.items.Inventory;
-import im.cave.ms.client.character.items.Item;
-import im.cave.ms.client.character.items.PetItem;
-import im.cave.ms.client.character.items.PotionPot;
-import im.cave.ms.client.character.items.WishedItem;
+import im.cave.ms.client.*;
+import im.cave.ms.client.character.items.*;
 import im.cave.ms.client.character.job.JobManager;
 import im.cave.ms.client.character.job.MapleJob;
 import im.cave.ms.client.character.job.adventurer.Beginner;
 import im.cave.ms.client.character.job.adventurer.Warrior;
 import im.cave.ms.client.character.potential.CharacterPotential;
 import im.cave.ms.client.character.potential.CharacterPotentialMan;
+import im.cave.ms.client.character.skill.MatrixInventory;
 import im.cave.ms.client.character.skill.Skill;
 import im.cave.ms.client.character.temp.TemporaryStatManager;
 import im.cave.ms.client.field.Effect;
 import im.cave.ms.client.field.MapleMap;
 import im.cave.ms.client.field.Portal;
-import im.cave.ms.client.field.obj.Android;
-import im.cave.ms.client.field.obj.Drop;
-import im.cave.ms.client.field.obj.Familiar;
-import im.cave.ms.client.field.obj.MapleMapObj;
-import im.cave.ms.client.field.obj.Pet;
-import im.cave.ms.client.field.obj.Summon;
+import im.cave.ms.client.field.obj.*;
 import im.cave.ms.client.field.obj.npc.Npc;
 import im.cave.ms.client.field.obj.npc.shop.NpcShop;
 import im.cave.ms.client.field.obj.npc.shop.NpcShopItem;
@@ -38,6 +25,8 @@ import im.cave.ms.client.multiplayer.guilds.Guild;
 import im.cave.ms.client.multiplayer.miniroom.MiniRoom;
 import im.cave.ms.client.multiplayer.miniroom.TradeRoom;
 import im.cave.ms.client.multiplayer.party.Party;
+import im.cave.ms.client.multiplayer.party.PartyMember;
+import im.cave.ms.client.multiplayer.party.PartyQuest;
 import im.cave.ms.client.multiplayer.party.PartyResult;
 import im.cave.ms.client.quest.Quest;
 import im.cave.ms.client.quest.QuestManager;
@@ -45,104 +34,41 @@ import im.cave.ms.connection.db.DataBaseManager;
 import im.cave.ms.connection.db.InlinedIntArrayConverter;
 import im.cave.ms.connection.netty.OutPacket;
 import im.cave.ms.connection.netty.Packet;
-import im.cave.ms.connection.packet.CashShopPacket;
-import im.cave.ms.connection.packet.PetPacket;
-import im.cave.ms.connection.packet.UserPacket;
-import im.cave.ms.connection.packet.UserRemote;
-import im.cave.ms.connection.packet.WorldPacket;
+import im.cave.ms.connection.packet.*;
 import im.cave.ms.connection.server.Server;
 import im.cave.ms.connection.server.channel.MapleChannel;
 import im.cave.ms.connection.server.world.World;
-import im.cave.ms.constants.GameConstants;
-import im.cave.ms.constants.ItemConstants;
-import im.cave.ms.constants.JobConstants;
-import im.cave.ms.constants.SkillConstants;
-import im.cave.ms.enums.BaseStat;
-import im.cave.ms.enums.BodyPart;
-import im.cave.ms.enums.CashShopCurrencyType;
-import im.cave.ms.enums.CharMask;
-import im.cave.ms.enums.ChatType;
-import im.cave.ms.enums.EquipAttribute;
-import im.cave.ms.enums.EquipSpecialAttribute;
-import im.cave.ms.enums.InventoryOperationType;
-import im.cave.ms.enums.InventoryType;
-import im.cave.ms.enums.MapTransferType;
-import im.cave.ms.enums.MoveAbility;
-import im.cave.ms.enums.SkillStat;
-import im.cave.ms.enums.SpecStat;
-import im.cave.ms.enums.MessageType;
+import im.cave.ms.constants.*;
+import im.cave.ms.enums.*;
 import im.cave.ms.provider.data.ItemData;
 import im.cave.ms.provider.data.SkillData;
 import im.cave.ms.provider.info.ItemInfo;
 import im.cave.ms.provider.info.SkillInfo;
 import im.cave.ms.scripting.item.ItemScriptManager;
-import im.cave.ms.tools.DateUtil;
-import im.cave.ms.tools.Pair;
-import im.cave.ms.tools.Position;
-import im.cave.ms.tools.Rect;
-import im.cave.ms.tools.Util;
+import im.cave.ms.tools.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.persistence.CascadeType;
-import javax.persistence.CollectionTable;
-import javax.persistence.Column;
-import javax.persistence.Convert;
-import javax.persistence.ElementCollection;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.MapKeyColumn;
-import javax.persistence.OneToMany;
-import javax.persistence.OneToOne;
-import javax.persistence.Table;
-import javax.persistence.Transient;
+import javax.persistence.*;
 import javax.transaction.Transactional;
 import java.io.Serializable;
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ScheduledFuture;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static im.cave.ms.constants.GameConstants.DEFAULT_BUDDY_CAPACITY;
-import static im.cave.ms.constants.GameConstants.DEFAULT_CASH_INVENTORY_SLOTS;
-import static im.cave.ms.constants.GameConstants.DEFAULT_CONSUME_INVENTORY_SLOTS;
-import static im.cave.ms.constants.GameConstants.DEFAULT_DAMAGE_SLOTS;
-import static im.cave.ms.constants.GameConstants.DEFAULT_EQUIP_INVENTORY_SLOTS;
-import static im.cave.ms.constants.GameConstants.DEFAULT_ETC_INVENTORY_SLOTS;
-import static im.cave.ms.constants.GameConstants.DEFAULT_INSTALL_INVENTORY_SLOTS;
-import static im.cave.ms.constants.GameConstants.INVENTORY_MAX_SLOTS;
-import static im.cave.ms.constants.GameConstants.NO_MAP_ID;
-import static im.cave.ms.constants.QuestConstants.QUEST_DAMAGE_SKIN;
-import static im.cave.ms.constants.QuestConstants.QUEST_EX_MAP_TRANSFER_COUPON_FREE_USED;
-import static im.cave.ms.constants.QuestConstants.QUEST_EX_MOB_KILL_COUNT;
-import static im.cave.ms.constants.QuestConstants.QUEST_EX_SKILL_STATE;
+import static im.cave.ms.client.character.temp.CharacterTemporaryStat.SoulMP;
+import static im.cave.ms.connection.packet.UserPacket.enableActions;
+import static im.cave.ms.constants.GameConstants.*;
+import static im.cave.ms.constants.QuestConstants.*;
 import static im.cave.ms.constants.ServerConstants.MAX_TIME;
 import static im.cave.ms.constants.ServerConstants.ZERO_TIME;
 import static im.cave.ms.enums.ChatType.SystemNotice;
 import static im.cave.ms.enums.InventoryOperationType.REMOVE;
 import static im.cave.ms.enums.InventoryOperationType.UPDATE_QUANTITY;
-import static im.cave.ms.enums.InventoryType.CASH;
-import static im.cave.ms.enums.InventoryType.CASH_EQUIP;
-import static im.cave.ms.enums.InventoryType.CONSUME;
-import static im.cave.ms.enums.InventoryType.EQUIP;
-import static im.cave.ms.enums.InventoryType.EQUIPPED;
-import static im.cave.ms.enums.InventoryType.ETC;
-import static im.cave.ms.enums.InventoryType.INSTALL;
-
-import im.cave.ms.enums.JobType;
+import static im.cave.ms.enums.InventoryType.*;
 
 /**
  * @author fair
@@ -162,7 +88,8 @@ public class MapleCharacter implements Serializable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
     private String name;
-    private byte world;
+    @Column(name = "world")
+    private byte worldId;
     private int accId;
     private byte buddyCapacity = DEFAULT_BUDDY_CAPACITY;
     private byte spawnPoint = 0;
@@ -173,6 +100,8 @@ public class MapleCharacter implements Serializable {
     private boolean isDeleted;
     private long extendedPendant;
     private long createdTime;
+    @Column(name = "`order`")
+    private int order;
     //好友
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "charId")
@@ -211,9 +140,12 @@ public class MapleCharacter implements Serializable {
     @JoinColumn(name = "cashEquipInventory")
     @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private Inventory cashEquipInventory;
+    @JoinColumn(name = "matrixInventory")
+    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
+    private MatrixInventory matrixInventory = new MatrixInventory();
     //快捷键映射
     @Convert(converter = InlinedIntArrayConverter.class)
-    private List<Integer> quickslots;
+    private List<Integer> quickSlots;
     @JoinColumn(name = "charId")
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Skill> skills;
@@ -275,7 +207,7 @@ public class MapleCharacter implements Serializable {
     //未领取的在线奖励
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "charId")
-    private List<OnlineReward> onlineRewards;
+    private List<HotTimeReward> hotTimeRewards;
     @JoinColumn(name = "guild")
     @OneToOne(cascade = CascadeType.ALL)
     private Guild guild;
@@ -283,7 +215,7 @@ public class MapleCharacter implements Serializable {
     @Transient
     private MapleMap map;
     @Transient
-    private int channel;
+    private int channelId;
     @Transient
     private MapleClient client;
     @Transient
@@ -300,10 +232,10 @@ public class MapleCharacter implements Serializable {
     private Map<Integer, Map<String, String>> questEx;
     //冷却时间计时器
     @Transient
-    private Map<Integer, Pair<Long, ScheduledFuture>> cooltimes;
+    private Map<Integer, Pair<Long, ScheduledFuture<?>>> cooltimes;
     //其他计时器
     @Transient
-    private Map<Integer, ScheduledFuture> schedules;
+    private Map<Integer, ScheduledFuture<?>> schedules;
     @Transient
     private MapleJob jobHandler;
     @Transient
@@ -372,6 +304,10 @@ public class MapleCharacter implements Serializable {
     private boolean battleRecordOn; //是否开启战斗分析
     @Transient
     private DamageCalc damageCalc;
+    @Transient
+    private Pair<Integer, Integer> prepareSkill = new Pair<>(0, 0); //按压技能 skillId,skillLevel
+    @Transient
+    private String portableChairMsg;
 
     public MapleCharacter() {
         temporaryStatManager = new TemporaryStatManager(this);
@@ -389,6 +325,10 @@ public class MapleCharacter implements Serializable {
 
     public static MapleCharacter getCharByName(String name) {
         return (MapleCharacter) DataBaseManager.getObjFromDB(MapleCharacter.class, "name", name);
+    }
+
+    public void cleanTemp() {
+        records.removeIf(record -> record.getType().isTransition());
     }
 
     /*
@@ -414,11 +354,10 @@ public class MapleCharacter implements Serializable {
         character.setInstallInventory(new Inventory(INSTALL, DEFAULT_INSTALL_INVENTORY_SLOTS));
         character.setEtcInventory(new Inventory(ETC, DEFAULT_ETC_INVENTORY_SLOTS));
         character.setCashInventory(new Inventory(CASH, DEFAULT_CASH_INVENTORY_SLOTS));
-        character.setCashInventory(new Inventory(CASH_EQUIP, INVENTORY_MAX_SLOTS));
+        character.setCashEquipInventory(new Inventory(CASH_EQUIP, INVENTORY_MAX_SLOTS));
         character.setStats(CharStats.getDefaultStats(jobId));
         character.setKeyMap(new MapleKeyMap());
         character.addCharLook(new CharLook());
-//        character.setCharLook(Collections.singleton(new CharLook()));
         if (!character.setJob(jobId)) {
             return null;
         }
@@ -520,15 +459,17 @@ public class MapleCharacter implements Serializable {
     }
 
     public void logout() {
-        log.info("{} 断开连接 世界-{},频道-{}", getName(), getWorld(), getChannel());
+        log.info("{} 断开连接 世界-{},频道-{}", getName(), getWorldId(), getChannelId());
         setLastLogout(DateUtil.getFileTime(System.currentTimeMillis()));
         if (getMap().getForcedReturn() != NO_MAP_ID) {
             this.mapId = getMap().getForcedReturn();
             this.spawnPoint = 0;
         }
-        Portal spawnPortalNearby = map.getSpawnPortalNearby(getPosition());
-        setSpawnPoint(spawnPortalNearby.getId());
-        getMap().removeChar(this);
+        if (getMap() != null) {
+            Portal spawnPortalNearby = getMap().getSpawnPortalNearby(getPosition());
+            setSpawnPoint(spawnPortalNearby.getId());
+            getMap().removeChar(this);
+        }
         if (getMiniRoom() != null) {
             if (getMiniRoom() instanceof TradeRoom) {
                 MapleCharacter other = ((TradeRoom) getMiniRoom()).getOther();
@@ -539,10 +480,12 @@ public class MapleCharacter implements Serializable {
         }
         buildQuestExStorage();
         setOnline(false);
-        getAccount().setOnlineChar(null);
+        if (getAccount() != null) {
+            getAccount().setOnlineChar(null);
+        }
         if (!isChangingChannel()) {
             getAccount().logout();
-            getClient().getMapleChannel().removePlayer(this);
+            getClient().getChannel().removePlayer(this);
         } else {
             getClient().setPlayer(null);
             getAccount().save();
@@ -550,6 +493,7 @@ public class MapleCharacter implements Serializable {
     }
 
     public void save() {
+        cleanTemp();
         buildQuestExStorage();
         getAccount().save();
     }
@@ -676,9 +620,14 @@ public class MapleCharacter implements Serializable {
     }
 
     public MapleMap getMap() {
-        World curWorld = Server.getInstance().getWorldById(world);
-        MapleChannel curChannel = curWorld.getChannel(channel);
-        return curChannel.getMap(mapId);
+        if (map != null) {
+            return map;
+        }
+        World curWorld = Server.getInstance().getWorldById(worldId);
+        MapleChannel curChannel = curWorld.getChannel(channelId);
+        MapleMap map = curChannel.getMap(mapId);
+        setMap(map);
+        return map;
     }
 
     public boolean hasItemCount(int itemID, int requiredCount) {
@@ -933,7 +882,7 @@ public class MapleCharacter implements Serializable {
                 isRunOnPickUp = ii.getSpecStats().getOrDefault(SpecStat.runOnPickup, 0) != 0;
             }
             if (isConsume) {
-                announce(UserPacket.enableActions());
+                announce(enableActions());
                 return true;
             } else if (isRunOnPickUp) {
                 String script = String.valueOf(itemId);
@@ -973,7 +922,7 @@ public class MapleCharacter implements Serializable {
             Map<Stat, Long> stats = new HashMap<>();
             setMeso(newMeso);
             stats.put(Stat.MESO, newMeso);
-            announce(UserPacket.updatePlayerStats(stats, false, this));
+            announce(UserPacket.statChanged(stats, false, this));
         }
     }
 
@@ -1009,32 +958,54 @@ public class MapleCharacter implements Serializable {
             expIncreaseInfo.setIndieBonusExp(expFromR);
             announce(WorldPacket.incExpMessage(expIncreaseInfo));
         }
-        announce(UserPacket.updatePlayerStats(stats, this));
+        announce(UserPacket.statChanged(stats, this));
     }
 
     private void setExp(long newExp) {
         stats.setExp(newExp);
     }
 
+    public boolean haveItem(int itemId, int quantity) {
+        ItemInfo ii = ItemData.getItemInfoById(itemId);
+        Item item = getInventory(ii.getInvType()).getItemByItemID(ii.getItemId());
+
+        if (item != null) {
+            return getInventory(ii.getInvType()).getItemQuantity(ii.getItemId()) >= quantity;
+        }
+        return false;
+    }
+
+    public int getItemQuantity(int itemId) {
+        ItemInfo ii = ItemData.getItemInfoById(itemId);
+        return getInventory(ii.getInvType()).getItemQuantity(ii.getItemId());
+    }
+
     public void consumeItem(int itemId, int quantity, boolean excl) {
         Item checkItem = ItemData.getItemCopy(itemId, false);
         Item item = getInventory(checkItem.getInvType()).getItemByItemID(itemId);
         if (item != null) {
+
             int consumed = quantity > item.getQuantity() ? 0 : item.getQuantity() - quantity;
+            int remain = quantity - item.getQuantity();
             item.setQuantity(consumed + 1); // +1 because 1 gets consumed by consumeItem(item)
             consumeItem(item, excl);
+            if (remain > 0) {
+                consumeItem(itemId, remain);
+            }
         }
     }
 
+    /*
+        使用前必须检查item是否数量大于等消耗量amount
+        只会减少指定的某个Item的数量
+     */
+    public void consumeItem(Item item, int amount) {
+        item.setQuantity(item.getQuantity() - amount);
+        announce(UserPacket.inventoryOperation(true, UPDATE_QUANTITY, (short) item.getPos(), (short) -1, 0, item));
+    }
 
     public void consumeItem(int itemId, int quantity) {
-        Item checkItem = ItemData.getItemCopy(itemId, false);
-        Item item = getInventory(checkItem.getInvType()).getItemByItemID(itemId);
-        if (item != null) {
-            int consumed = quantity > item.getQuantity() ? 0 : item.getQuantity() - quantity;
-            item.setQuantity(consumed + 1); // +1 because 1 gets consumed by consumeItem(item)
-            consumeItem(item, true);
-        }
+        consumeItem(itemId, quantity, true);
     }
 
     public void consumeItem(Item item) {
@@ -1072,7 +1043,10 @@ public class MapleCharacter implements Serializable {
             setStat(Stat.MP, newMP);
             stats.put(Stat.MP, (long) newMP);
         }
-        announce(UserPacket.updatePlayerStats(stats, this));
+        if (getParty() != null) {
+            updatePartyHpBar();
+        }
+        announce(UserPacket.statChanged(stats, this));
     }
 
     public void healMP(int amount) {
@@ -1082,7 +1056,7 @@ public class MapleCharacter implements Serializable {
         Map<Stat, Long> stats = new HashMap<>();
         setStat(Stat.MP, newMP);
         stats.put(Stat.MP, (long) newMP);
-        announce(UserPacket.updatePlayerStats(stats, this));
+        announce(UserPacket.statChanged(stats, this));
     }
 
     public void addSpToJobByCurrentLevel(int amount) {
@@ -1108,19 +1082,24 @@ public class MapleCharacter implements Serializable {
      */
 
     public void changeMap(int mapId, boolean load) {
-        MapleChannel channel = Server.getInstance().getWorldById(world).getChannel(this.channel);
+        MapleChannel channel = Server.getInstance().getWorldById(worldId).getChannel(this.channelId);
         MapleMap map = channel.getMap(mapId);
-        if (map != null) {
-            if (map == getMap() && !load) {
-                announce(WorldPacket.mapTransferResult(MapTransferType.AlreadyInMap, (byte) 0, null));
-                enableAction();
-                return;
-            }
-            changeMap(map, getSpawnPoint(), load);
-        } else if (!load) {
-            announce(WorldPacket.mapTransferResult(MapTransferType.TargetNotExist, (byte) 0, null));
-            announce(UserPacket.enableActions());
+        if (map == null && load) {
+            map = channel.getMap(mapId);
         }
+        if (map == null) {
+            announce(WorldPacket.mapTransferResult(MapTransferType.TargetNotExist, (byte) 0, null));
+            enableActions();
+            return;
+        } else if (map == getMap() && !load) {
+            announce(WorldPacket.mapTransferResult(MapTransferType.AlreadyInMap, (byte) 0, null));
+            enableAction();
+            return;
+        }
+        if (load) {
+            initSoulMP();
+        }
+        changeMap(map, map.getSpawnPortal().getId(), load);
     }
 
     public void changeMap(int mapId) {
@@ -1131,8 +1110,9 @@ public class MapleCharacter implements Serializable {
         changeMap(map, (byte) portal, false);
     }
 
+    //传送门的走这里
     public void changeMap(int mapId, byte portal) {
-        MapleChannel channel = Server.getInstance().getWorldById(world).getChannel(this.channel);
+        MapleChannel channel = Server.getInstance().getWorldById(worldId).getChannel(this.channelId);
         MapleMap map = channel.getMap(mapId);
         if (map != null) {
             if (map == getMap()) {
@@ -1144,7 +1124,17 @@ public class MapleCharacter implements Serializable {
         }
     }
 
+    //切换地图
     private void changeMap(MapleMap map, byte portal, boolean load) {
+        if (!load) {
+            announce(UserPacket.effect(Effect.playPortalSE()));
+        }
+        if (party != null && party.getPartyQuest() != null) { //处理组队地图
+            int pMap = map.getId();
+            MapleMap temp = Util.findWithPred(party.getPartyQuest().getMaps(), m -> m.getId() == pMap);
+            if (temp != null)
+                map = temp;
+        }
         getVisibleMapObjs().clear();
         getVisibleChars().clear();
         if (getMap() != null) {
@@ -1159,6 +1149,7 @@ public class MapleCharacter implements Serializable {
             announce(WorldPacket.getWarpToMap(this, map, portal));
         }
         map.addPlayer(this);
+        addVisitedMap(map);
         initPets();
         map.sendMapObjectPackets(this);
         map.broadcastMessage(UserRemote.hiddenEffectEquips(this));
@@ -1166,9 +1157,17 @@ public class MapleCharacter implements Serializable {
         announce(WorldPacket.quickMove(map.isTown() && (map.getId() % 1000000) == 0));
         if (getParty() != null) {
             announce(WorldPacket.partyResult(PartyResult.loadParty(getParty())));
+            PartyMember partyMember = getParty().getPartyMemberByID(getId());
+            PartyQuest partyQuest = partyMember.getPartyQuest();
+            if (partyQuest != null && !partyQuest.getMaps().contains(map)) {
+                partyMember.setPartyQuest(null);
+                getClock().stopClock();
+            }
+        }
+        if (getClock() != null) {
+            getClock().showClock();
         }
     }
-
     /*
         地图切换 结束
      */
@@ -1177,12 +1176,17 @@ public class MapleCharacter implements Serializable {
         for (PetItem petItem : getCashInventory().getItems().stream().filter(i -> i instanceof PetItem && ((PetItem) i).getActiveState() > 0)
                 .map(i -> ((PetItem) i)).collect(Collectors.toList())) {
             Pet p = getPets().stream().filter(pet -> pet.getPetItem().equals(petItem)).findAny().orElse(null);
+            boolean load = false;
             if (p == null) {
                 // only create a new pet if the active state is > 0 (active), but isn't added to our own list yet
                 p = petItem.createPet(this);
                 addPet(p);
+                load = true;
             }
             getMap().broadcastMessage(PetPacket.petActivateChange(p, true, (byte) 0));
+            if (load && petItem.getExceptionList() != null) {
+                announce(PetPacket.initPetExceptionList(p));
+            }
         }
     }
 
@@ -1235,9 +1239,20 @@ public class MapleCharacter implements Serializable {
         }
     }
 
-    public void addSkill(int linkSkillID, byte linkSkillLevel, int i) {
-
+    public void addSkill(int skillId, int currentLevel, int masterLevel) {
+        Skill skill = SkillData.getSkill(skillId);
+        if (skill == null) {
+            log.error("No such skill found.");
+            return;
+        }
+        skill.setCurrentLevel(currentLevel);
+        skill.setMasterLevel(masterLevel);
+        List<Skill> list = new ArrayList<>();
+        list.add(skill);
+        addSkill(skill);
+        announce(UserPacket.changeSkillRecordResult(list, true, false, false, false));
     }
+
 
     public void addToBaseStatCache(Skill skill) {
         SkillInfo si = SkillData.getSkillInfo(skill.getSkillId());
@@ -1286,8 +1301,8 @@ public class MapleCharacter implements Serializable {
         setChangingChannel(true);
         MapleMap map = getMap();
         map.removeChar(this);
-        Server.getInstance().addClientInTransfer((byte) channel, getId(), getClient());
-        announce(WorldPacket.getChannelChange(true, getMapleWorld().getCashShop().getPort()));
+        Server.getInstance().addClientInTransfer((byte) channelId, getId(), getClient());
+        announce(WorldPacket.getChannelChange(true, getWorld().getCashShop().getPort()));
     }
 
     public void enterAuction() {
@@ -1295,8 +1310,8 @@ public class MapleCharacter implements Serializable {
         setChangingChannel(true);
         MapleMap map = getMap();
         map.removeChar(this);
-        Server.getInstance().addClientInTransfer((byte) channel, getId(), getClient());
-        announce(WorldPacket.getChannelChange(true, getMapleWorld().getAuction().getPort()));
+        Server.getInstance().addClientInTransfer((byte) channelId, getId(), getClient());
+        announce(WorldPacket.getChannelChange(true, getWorld().getAuction().getPort()));
     }
 
 
@@ -1315,7 +1330,7 @@ public class MapleCharacter implements Serializable {
         map.removeChar(this);
         this.map = null;
         Server.getInstance().addClientInTransfer(channel, getId(), getClient());
-        int port = Server.getInstance().getChannel(world, channel).getPort();
+        int port = Server.getInstance().getChannel(worldId, channel).getPort();
         announce(WorldPacket.getChannelChange(true, port));
     }
 
@@ -1337,11 +1352,11 @@ public class MapleCharacter implements Serializable {
         addStat(stat, amount);
         HashMap<Stat, Long> stats = new HashMap<>();
         stats.put(stat, getStat(stat));
-        announce(UserPacket.updatePlayerStats(stats, true, this));
+        announce(UserPacket.statChanged(stats, true, this));
     }
 
     public void dropMessage(String message) {
-        announce(WorldPacket.serverNotice(message));
+        announce(WorldPacket.scriptProgressMessage(message));
     }
 
     public boolean isSkillInCd(int skillId) {
@@ -1413,7 +1428,7 @@ public class MapleCharacter implements Serializable {
         setJobHandler(JobManager.getJobById(getJob(), this));
         HashMap<Stat, Long> stats = new HashMap<>();
         stats.put(Stat.JOB, (long) getJob());
-        announce(UserPacket.updatePlayerStats(stats, this));
+        announce(UserPacket.statChanged(stats, this));
         return true;
     }
 
@@ -1429,7 +1444,7 @@ public class MapleCharacter implements Serializable {
             int cdInMillis = cdInSec > 0 ? cdInSec * 1000 : si.getValue(SkillStat.cooltimeMS, slv);
             if (cdInMillis > 0) {
                 addSkillCoolTime(skillId, System.currentTimeMillis() + cdInMillis);
-                write(UserPacket.skillCoolTimeSet(skillId, cdInMillis));
+                write(UserPacket.setSkillCoolTime(skillId, cdInMillis));
             }
         }
     }
@@ -1476,7 +1491,7 @@ public class MapleCharacter implements Serializable {
         }
         addQuestExAndSendPacket(QUEST_EX_SKILL_STATE, value);
         if (skillId == Warrior.HERO_COMBO_ATTACK) {
-            ((Warrior) getJobHandler()).comboCount.decrementAndGet();
+            ((Warrior) getJobHandler()).getComboCount().decrementAndGet();
             ((Warrior) getJobHandler()).incCombo();
         }
     }
@@ -1685,12 +1700,12 @@ public class MapleCharacter implements Serializable {
         return chr;
     }
 
-    public World getMapleWorld() {
-        return Server.getInstance().getWorldById(world);
+    public World getWorld() {
+        return Server.getInstance().getWorldById(worldId);
     }
 
-    public MapleChannel getMapleChannel() {
-        return client.getMapleChannel();
+    public MapleChannel getChannel() {
+        return client.getChannel();
     }
 
     public void deductMoney(long amount) {
@@ -1824,7 +1839,7 @@ public class MapleCharacter implements Serializable {
     }
 
     public void enableAction() {
-        announce(UserPacket.enableActions());
+        announce(enableActions());
     }
 
 
@@ -1873,23 +1888,6 @@ public class MapleCharacter implements Serializable {
         }
     }
 
-    public void initMapTransferCoupon() {
-        if (!getQuestEx().containsKey(QUEST_EX_MAP_TRANSFER_COUPON_FREE_USED)) {
-            Map<String, String> options = new HashMap<>();
-            options.put("count", "0");
-            options.put("date", DateUtil.getFormatDate(DateUtil.getNextMonday()));
-            addQuestEx(QUEST_EX_MAP_TRANSFER_COUPON_FREE_USED, options);
-        } else {
-            Map<String, String> options = getQuestEx().get(QUEST_EX_MAP_TRANSFER_COUPON_FREE_USED);
-            String dateString = options.get("date");
-            LocalDate date = DateUtil.getDate(dateString);
-            if (!LocalDate.now().isBefore(date)) {
-                options.put("count", "0");
-                options.put("date", DateUtil.getFormatDate(DateUtil.getNextMonday()));
-                addQuestEx(QUEST_EX_MAP_TRANSFER_COUPON_FREE_USED, options);
-            }
-        }
-    }
 
     public void encodeRemainingSp(OutPacket out) {
         List<Integer> remainingSp = getRemainingSp();
@@ -1916,7 +1914,7 @@ public class MapleCharacter implements Serializable {
         if (mask.isInMask(CharMask.Character)) {
             out.writeInt(getId());
             out.writeInt(getId());
-            out.writeInt(getWorld());
+            out.writeInt(getWorldId());
             out.writeAsciiString(getName(), 13);
             CharLook charLook = getCharLook();
             out.write(charLook.getGender());
@@ -1952,16 +1950,23 @@ public class MapleCharacter implements Serializable {
             out.write(10); //pvp grade
             out.writeInt(0); // pvp maplePoint
             out.write(5); // unk
-            out.write(5); // pvp mode type
+            out.write(6); // pvp mode type 5或者6
             out.writeInt(0); //event maplePoint
 
             out.writeReversedLong(getLastLogout());
             out.writeLong(MAX_TIME);
-            out.writeLong(ZERO_TIME);
+            out.writeLong(ZERO_TIME); //这几个时间都不对
+            //Burning::encode
+            //begin level
+            //end level
+            //00 00 00 00
+            //02 00 level added
             out.writeZeroBytes(14);
+
             out.writeInt(-1);
             out.writeInt(0); //bBurning
             out.write(getBuddyCapacity()); //friend
+
             boolean hasBlessingOfFairy = getBlessOfFairyOrigin() != null;
             out.writeBool(hasBlessingOfFairy);
             if (hasBlessingOfFairy) {
@@ -1974,10 +1979,47 @@ public class MapleCharacter implements Serializable {
             }
             out.writeBool(false); //ultimate explorer
         }
+
         out.writeInt(0);
         out.write(-1);
         out.writeInt(0);
         out.write(-1);
+
+        if (mask.isInMask(CharMask.Money)) {
+            out.writeLong(getMeso());
+            out.writeInt(getId());
+            out.writeInt(0); //打豆豆.豆子
+            out.writeInt(0);
+            out.writeInt(0);
+        }
+
+        if (mask.isInMask(CharMask.ItemPot)) { //可能是假的
+            out.writeInt(getPotionPot() != null);
+            if (getPotionPot() != null) {
+                getPotionPot().encode(out);
+            }
+        }
+
+        if (mask.isInMask(CharMask.InventorySize)) {
+            out.writeInt(getInventory(InventoryType.EQUIP).getSlots());
+            out.writeInt(getInventory(InventoryType.CONSUME).getSlots());
+            out.writeInt(getInventory(InventoryType.INSTALL).getSlots());
+            out.writeInt(getInventory(InventoryType.ETC).getSlots());
+            out.writeInt(getInventory(InventoryType.CASH).getSlots());
+            out.writeInt(getInventory(InventoryType.CASH_EQUIP).getSlots());
+        }
+
+        //装备吊坠栏扩充
+        if (mask.isInMask(CharMask.EquipExt)) {
+            if (getExtendedPendant() > 0 && getExtendedPendant() > DateUtil.getFileTime(System.currentTimeMillis())) {
+                out.writeLong(getExtendedPendant());
+            } else {
+                out.writeLong(ZERO_TIME);
+
+            }
+            out.write(0);
+        }
+
 
         Account account = getAccount();
         Map<Integer, String> sharedQuestExStorage = account.getSharedQuestExStorage();
@@ -2045,5 +2087,104 @@ public class MapleCharacter implements Serializable {
 
     public void setDamageCalc(DamageCalc damageCalc) {
         this.damageCalc = damageCalc;
+    }
+
+
+    public void setClock(Clock clock) {
+        this.clock = clock;
+    }
+
+    public void setPrepareSkill(int skill, int slv) {
+        this.prepareSkill = new Pair<>(skill, slv);
+    }
+
+    public Pair<Integer, Integer> getPrepareSkill() {
+        return prepareSkill;
+    }
+
+    public void initSoulMP() {
+        Equip weapon = getEquippedEquip(BodyPart.Weapon);
+        TemporaryStatManager tsm = getTemporaryStatManager();
+        if (weapon != null && weapon.getSoulSocketId() != 0 && !tsm.hasStat(SoulMP)) {
+            Option o = new Option();
+            o.rOption = ItemConstants.getSoulSkillFromSoulID(weapon.getSoulOptionId());
+            o.tOption = Integer.MAX_VALUE;
+            o.xOption = ItemConstants.MAX_SOUL_CAPACITY;
+            tsm.putCharacterStatValue(SoulMP, o);
+            tsm.sendSetStatPacket();
+        }
+    }
+
+    public void updatePartyHpBar() {
+        for (MapleCharacter member : getParty().getOnlineChar()) {
+            if (member.getMap().equals(getMap())) {
+                member.announce(WorldPacket.receiveHP(this));
+            }
+        }
+    }
+
+    public void teleport(String portalName) {
+        Portal portal = getMap().getPortal(portalName);
+        announce(UserPacket.teleport(0, position, portal));
+    }
+
+    public void addVisitedMap(MapleMap map) {
+        visitedMaps.add(map.getId());
+    }
+
+    public Position getPosition() {
+        if (position == null) {
+            byte sp = getSpawnPoint();
+            Portal portal = getMap().getPortal(sp);
+            return portal.getPosition();
+        }
+        return position;
+    }
+
+    public Map<Integer, Map<String, String>> getQuestEx() {
+        return questEx;
+    }
+
+    public String getQuestEx(int questID, String key) {
+        Map<String, String> str = getQuestEx().getOrDefault(questID, null);
+        if (str != null) {
+            return str.getOrDefault(key, null);
+        }
+        return null;
+    }
+
+    public boolean setQuestEx(int questId, String key, String value) {
+        if (key == null || key.isEmpty()) {
+            return false;
+        }
+        if (value.equals("DayN")) {
+            return false;
+        }
+        Map<String, String> str = getQuestEx().getOrDefault(questId, null);
+        if (str == null) {
+            getQuestEx().put(questId, new HashMap<>());
+            str = getQuestEx().getOrDefault(questId, null);
+            if (str == null) {
+                return false;
+            }
+        }
+        if (!value.isEmpty()) {
+            str.put(key, value);
+        } else {
+            str.remove(key);
+        }
+        return true;
+    }
+
+    public int getShards() {
+        String value = getQuestEx(QuestConstants.QUEST_EX_MATRIX_SHARDS, "count");
+        if (value != null) {
+            return Integer.parseInt(value);
+        }
+        return 0;
+    }
+
+    public void incShards(int inc) {
+        setQuestEx(QuestConstants.QUEST_EX_MATRIX_SHARDS, "count", Integer.toString(getShards() + inc));
     }
 }

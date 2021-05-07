@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory;
 /**
  * @author fair
  * @version V1.0
- * @Package im.cave.ms.net.server.channel.handler
+ * @Package im.cave.ms.net.server.channelId.handler
  * @date 12/9 17:04
  */
 public class QuestHandler {
@@ -117,4 +117,15 @@ public class QuestHandler {
             player.announce(QuestPacket.questResult(QuestType.QuestRes_Act_Success, questId, npcTemplateId, 0, false));
         }
     }
+
+
+    public static void handleQuestRequirementUpdate() {
+        //todo
+    }
+
+    public static void handleQuestComplete(){
+
+
+    }
+
 }

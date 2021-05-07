@@ -1,16 +1,9 @@
 package im.cave.ms.connection.db;
 
 import im.cave.ms.client.Account;
-import im.cave.ms.client.OnlineReward;
+import im.cave.ms.client.HotTimeReward;
 import im.cave.ms.client.Record;
-import im.cave.ms.client.character.CharLook;
-import im.cave.ms.client.character.CharStats;
-import im.cave.ms.client.character.DamageSkinSaveData;
-import im.cave.ms.client.character.KeyBind;
-import im.cave.ms.client.character.Macro;
-import im.cave.ms.client.character.MapleCharacter;
-import im.cave.ms.client.character.MapleKeyMap;
-import im.cave.ms.client.character.NonCombatStatDayLimit;
+import im.cave.ms.client.character.*;
 import im.cave.ms.client.character.items.CashShopItem;
 import im.cave.ms.client.character.items.Equip;
 import im.cave.ms.client.character.items.ExceptionItem;
@@ -20,6 +13,9 @@ import im.cave.ms.client.character.items.Item;
 import im.cave.ms.client.character.items.PetItem;
 import im.cave.ms.client.character.items.WishedItem;
 import im.cave.ms.client.character.potential.CharacterPotential;
+import im.cave.ms.client.character.skill.MatrixInventory;
+import im.cave.ms.client.character.skill.MatrixSkill;
+import im.cave.ms.client.character.skill.MatrixSlot;
 import im.cave.ms.client.character.skill.Skill;
 import im.cave.ms.client.field.obj.Android;
 import im.cave.ms.client.multiplayer.guilds.GuildGrade;
@@ -70,7 +66,7 @@ public class DataBaseManager {
     public static void init() {
         Configuration configuration = new Configuration().configure();
         configuration.setProperty("autoReconnect", "true");
-        Class[] dbClasses = new Class[]{
+        Class<?>[] dbClasses = new Class[]{
                 Android.class,
                 PetItem.class,
                 FlameStats.class,
@@ -115,8 +111,12 @@ public class DataBaseManager {
                 MapleNotes.class,
                 WishedItem.class,
                 ExceptionItem.class,
-                OnlineReward.class,
+                HotTimeReward.class,
                 Express.class,
+                LinkSkill.class,
+                MatrixInventory.class,
+                MatrixSkill.class,
+                MatrixSlot.class
 
         };
         for (var clazz : dbClasses) {

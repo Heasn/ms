@@ -2,6 +2,9 @@ package im.cave.ms.client.field.obj.mob;
 
 import im.cave.ms.client.character.ExpIncreaseInfo;
 import im.cave.ms.client.character.MapleCharacter;
+import im.cave.ms.client.character.Option;
+import im.cave.ms.client.character.temp.CharacterTemporaryStat;
+import im.cave.ms.client.character.temp.TemporaryStatManager;
 import im.cave.ms.client.field.FieldEffect;
 import im.cave.ms.client.field.Foothold;
 import im.cave.ms.client.field.MapleMap;
@@ -133,7 +136,7 @@ public class Mob extends MapleMapObj {
     private String banMsg = "";
     private List<Tuple<Integer, String>> banMaps = new ArrayList<>();// field, portal name
     private boolean isEscortMob = false;
-    //    private List<EscortDest> escortDest = new ArrayList<>();
+    private List<EscortDest> escortDest = new ArrayList<>();
     private int currentDestIndex = 0;
     private int escortStopDuration = 0;
 
@@ -418,7 +421,7 @@ public class Mob extends MapleMapObj {
         long totalDamage = getInjuryStatistics().values().stream().mapToLong(l -> l).sum();
         for (MapleCharacter chr : getInjuryStatistics().keySet()) {
             double damagePercent = getInjuryStatistics().get(chr) / (double) totalDamage;
-            int mobExpRate = chr.getLevel() < 10 ? 1 : Config.worldConfig.getWorldInfo(chr.getWorld()).exp_rate;
+            int mobExpRate = chr.getLevel() < 10 ? 1 : Config.worldConfig.getWorldInfo(chr.getWorldId()).exp_rate;
             long appliedExpPre = (long) (exp * damagePercent * mobExpRate);
             long appliedExpPost = appliedExpPre;
             ExpIncreaseInfo expIncreaseInfo = new ExpIncreaseInfo();
@@ -461,7 +464,13 @@ public class Mob extends MapleMapObj {
         }
         int totalMesoRate = 0;
         int totalDropRate = 0;
+
         getMap().drop(getDrops(), getMap().getFoothold(fh), getPosition(), ownerId, totalMesoRate, totalDropRate, false);
+        if (chr != null) {
+            TemporaryStatManager tsm = chr.getTemporaryStatManager();
+            Option option = tsm.getOption(CharacterTemporaryStat.SoulMP);
+
+        }
     }
 
     public void encodeInit(OutPacket out) {
@@ -494,5 +503,17 @@ public class Mob extends MapleMapObj {
             // 01 00 00 00 // 类型normal, 3 elite boss probably
         }
         out.writeZeroBytes(42);
+    }
+
+    public void addEscortDest(int destPosX, int destPosY, int attr) {
+        addEscortDest(destPosX, destPosY, attr, 0, 0);
+    }
+
+    private void addEscortDest(int destPosX, int destPosY, int attr, int mass, int stopDuration) {
+        escortDest.add(new EscortDest(destPosX, destPosY, attr, mass, stopDuration));
+    }
+
+    public void escortFullPath(int oldAttr) {
+        getMap().broadcastMessage(MobPacket.escortFullPath(this, oldAttr, false));
     }
 }

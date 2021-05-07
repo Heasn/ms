@@ -20,29 +20,17 @@ import im.cave.ms.connection.packet.UserPacket;
 import im.cave.ms.connection.packet.UserRemote;
 import im.cave.ms.constants.GameConstants;
 import im.cave.ms.constants.ItemConstants;
-import im.cave.ms.enums.BroadcastMsgType;
-import im.cave.ms.enums.EquipAttribute;
-import im.cave.ms.enums.EquipBaseStat;
-import im.cave.ms.enums.EquipSpecialAttribute;
-import im.cave.ms.enums.EquipmentEnchantType;
-import im.cave.ms.enums.InventoryOperationType;
-import im.cave.ms.enums.InventoryType;
-import im.cave.ms.enums.ItemGrade;
-import im.cave.ms.enums.ScrollStat;
-import im.cave.ms.enums.SpecStat;
+import im.cave.ms.enums.*;
 import im.cave.ms.provider.data.ItemData;
 import im.cave.ms.provider.data.StringData;
 import im.cave.ms.provider.info.ItemInfo;
 import im.cave.ms.scripting.item.ItemScriptManager;
 import im.cave.ms.tools.Position;
 import im.cave.ms.tools.Util;
-import org.graalvm.nativeimage.c.struct.CField;
 
-import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import static im.cave.ms.constants.ItemConstants.Item_Tag;
@@ -63,7 +51,7 @@ import static im.cave.ms.enums.InventoryType.EQUIPPED;
 /**
  * @author fair
  * @version V1.0
- * @Package im.cave.ms.net.handler.channel
+ * @Package im.cave.ms.net.handler.channelId
  * @date 11/29 22:00
  */
 public class InventoryHandler {
@@ -104,6 +92,7 @@ public class InventoryHandler {
             Position position = player.getPosition();
             Foothold fh = map.findFootHoldBelow(new Position(position.getX(), position.getY() - GameConstants.DROP_HEIGHT));
             drop.setCanBePickedUpByPet(false);
+            drop.setTimeoutStrategy(DropTimeoutStrategy.FFA.getVal());
             map.drop(drop, position, new Position(position.getX(), fh.getYFromX(position.getX())));
             if (fullDrop) {
                 c.announce(UserPacket.inventoryOperation(true, REMOVE, oldPos, newPos, 0, item));
@@ -420,6 +409,11 @@ public class InventoryHandler {
         ItemScriptManager.getInstance().startScript(itemId, script, npcId, c);
     }
 
+    //todo
+    public static void handleUserAdditionalSlotExtendItemUseRequest(InPacket in, MapleClient c) {
+
+    }
+
     public static void handleUserFlameItemUseRequest(InPacket in, MapleClient c) {
         MapleCharacter player = c.getPlayer();
         player.setTick(in.readInt());
@@ -535,27 +529,31 @@ public class InventoryHandler {
     }
 
     public static void handleUserConsumeCashItemUseRequest(InPacket in, MapleClient c) {
-        MapleCharacter player = c.getPlayer();
-        player.setTick(in.readInt());
+        MapleCharacter chr = c.getPlayer();
+        chr.setTick(in.readInt());
+
         short uPos = in.readShort();
         int itemId = in.readInt();
+        //通用检查
         InventoryType inventoryType = ItemConstants.getInvTypeByItemId(itemId);
         if (inventoryType == null) {
             return;
         }
-        Item item = player.getInventory(inventoryType).getItem(uPos);
+        Item item = chr.getInventory(inventoryType).getItem(uPos);
         if (item.getItemId() != itemId) {
             return;
         }
+        boolean success = CashItemActuator.dispatch(item, chr, in);
+
         if (itemId / 10000 == 515) {
             ItemInfo ii = ItemData.getItemInfoById(itemId);
             int gender = ii.getGender();
             boolean choice = ii.isChoice();
             int incCharmExp = ii.getIncCharmExp();
             String script = String.format("cash_%d", itemId);
-            if (gender != 2 && gender != player.getGender()) {
-                player.announce(MessagePacket.broadcastMsg("性别不符", BroadcastMsgType.ALERT));
-                player.enableAction();
+            if (gender != 2 && gender != chr.getGender()) {
+                chr.announce(MessagePacket.broadcastMsg("性别不符", BroadcastMsgType.ALERT));
+                chr.enableAction();
                 return;
             }
             ItemScriptManager.getInstance().startScript(itemId, script, 0, c);
@@ -578,10 +576,10 @@ public class InventoryHandler {
             case Maple_Any_Door: {
                 in.readByte();
                 int targetId = in.readInt();
-                player.changeMap(targetId);
+                chr.changeMap(targetId);
             }
         }
-        player.consumeItem(itemId, 1, false);
+        chr.consumeItem(itemId, 1, false);
     }
 
     public static void handleUserLotteryItemUseRequest(InPacket in, MapleClient c) {
@@ -709,6 +707,7 @@ public class InventoryHandler {
         c.announce(potionPot.showPotionPotMsg(1, 3));
     }
 
+    //todo
     public static void handlePotionPotUseRequest(InPacket in, MapleClient c) {
         MapleCharacter player = c.getPlayer();
         player.setTick(in.readInt());
@@ -774,6 +773,7 @@ public class InventoryHandler {
         player.consumeItem(scroll);
     }
 
+    //强化卷
     public static void handleUserHyperUpgradeItemUseRequest(InPacket in, MapleClient c) {
         MapleCharacter player = c.getPlayer();
         in.readInt();
@@ -789,6 +789,7 @@ public class InventoryHandler {
         }
         int scrollId = scroll.getItemId();
         Map<ScrollStat, Integer> vals = ItemData.getItemInfoById(scrollId).getScrollStats();
+
     }
 
     //todo
@@ -806,6 +807,7 @@ public class InventoryHandler {
         player.announce(NpcPacket.avatarChangeSelector(uPos, itemId, options));
     }
 
+
     public static void handlePotionPotAddRequest(InPacket in, MapleClient c) {
         MapleCharacter player = c.getPlayer();
         player.setTick(in.readInt());
@@ -817,11 +819,50 @@ public class InventoryHandler {
             player.chatMessage("物品不存在");
             return;
         }
+        int playerMaxMP = player.getMaxMP();
+        int playerMaxHP = player.getMaxHP();
         PotionPot potionPot = player.getPotionPot();
+        int max = potionPot.getMax();
+        int hp = potionPot.getHp();
+        int mp = potionPot.getMp();
+        ItemInfo ii = ItemData.getItemInfoById(item.getItemId());
+        Map<SpecStat, Integer> specStats = ii.getSpecStats();
+        int addHp = 0, addMp = 0;
+        for (SpecStat stat : specStats.keySet()) {
+            Integer i = specStats.getOrDefault(stat, 0);
+            switch (stat) {
+                case hpR:
+                    addHp = addHp + i * playerMaxHP;
+                    break;
+                case mpR:
+                    addMp = addMp + i * playerMaxMP;
+                    break;
+                case hp:
+                    addHp += i;
+                    break;
+                case mp:
+                    addMp += i;
+                    break;
+            }
+        }
+        addHp *= 1.2;
+        addMp *= 1.2;
+
+
+        int hpNeedConsume = hp == 0 ? 0 : (max - hp) / addHp;
+        int mpNeedConsume = mp == 0 ? 0 : (max - mp) / addMp;
+        int need = Math.max(hpNeedConsume, mpNeedConsume);
+        int quantity = item.getQuantity();
+        int consume = Math.min(need, quantity);
+        player.consumeItem(item, consume);
+        potionPot.setHp(Math.min(max, (hp + consume * addHp)));
+        potionPot.setMp(Math.min(max, (mp + consume + addMp)));
+
+        player.announce(potionPot.updatePotionPot());
         player.announce(potionPot.showPotionPotMsg(2, 0));
     }
 
-    public static void handleUserItemSkillOptionUpgradeItemUseRequest(InPacket in, MapleClient c) {
+    public static void handleUserItemSkillSocketUpgradeItemUseRequest(InPacket in, MapleClient c) {
         MapleCharacter player = c.getPlayer();
         player.setTick(in.readInt());
         short uPos = in.readShort();
@@ -841,5 +882,169 @@ public class InventoryHandler {
         }
         player.getMap().broadcastMessage(UserRemote.showItemSkillSocketUpgradeEffect(player.getId(), success));
         player.consumeItem(item);
+
+    }
+
+
+    //todo 添加技能？
+    public static void handleUserItemSkillOptionUpgradeItemUseRequest(InPacket in, MapleClient c) {
+        MapleCharacter player = c.getPlayer();
+        player.setTick(in.readInt());
+        short uPos = in.readShort();
+        short ePos = (short) Math.abs(in.readShort());
+        Item item = player.getConsumeInventory().getItem(uPos);
+        Equip equip = (Equip) player.getEquippedInventory().getItem(ePos);
+        if (item == null || equip == null || !ItemConstants.isWeapon(equip.getItemId()) ||
+                !ItemConstants.isSoulEnchanter(item.getItemId()) || equip.getRLevel() + equip.getIIncReq() < ItemConstants.MIN_LEVEL_FOR_SOUL_SOCKET) {
+            player.enableAction();
+            return;
+        }
+        equip.setSoulOptionId((short) (1 + item.getItemId() % ItemConstants.SOUL_ITEM_BASE_ID));
+        short option = ItemConstants.getSoulOptionFromSoul(equip.getSoulOptionId());
+        int skillId = ItemConstants.getSoulSkillFromSoulID(equip.getSoulOptionId());
+        equip.setSoulOption(option);
+        equip.updateToChar(player);
+        player.consumeItem(item);
+        player.addSkill(skillId, 1, 1);
+        player.getMap().broadcastMessage(UserRemote.showItemSkillOptionUpgradeEffect(player.getId(), true, false));
+    }
+
+
+    public static void handleHexagonalCubeModified(InPacket in, MapleClient c) {
+        MapleCharacter chr = c.getPlayer();
+        chr.setTick(in.readInt());
+        List<Integer> options = new ArrayList<>();
+        int i = in.readInt();
+        for (int i1 = 0; i1 < i; i1++) {
+            options.add(i1);
+        }
+        chr.announce(UserPacket.hexagonalCubeModifiedResult());
+    }
+
+    public static void handleUniqueCubeModified(InPacket in, MapleClient c) {
+        MapleCharacter chr = c.getPlayer();
+        chr.setTick(in.readInt());
+
+        int unk = in.readInt();
+        int line = 0;
+
+        chr.announce(UserPacket.uniqueCubeModifiedResult(line));
+    }
+
+    public static void handleUserItemSlotExtendItemUseRequest(InPacket in, MapleClient c) {
+        MapleCharacter chr = c.getPlayer();
+        chr.setTick(in.readInt());
+
+        short uPos = in.readShort();
+        short ePos = in.readShort();
+        Item item = chr.getConsumeInventory().getItem(uPos);
+        Item equipItem = chr.getEquipInventory().getItem(ePos);
+        if (item == null || equipItem == null) {
+            chr.chatMessage("Could not find either the use item or the equip.");
+            return;
+        }
+
+        int itemID = item.getItemId();
+        Equip equip = (Equip) equipItem;
+        int successChance = ItemData.getItemInfoById(itemID).getScrollStats().getOrDefault(ScrollStat.success, 100);
+        boolean success = Util.succeedProp(successChance);
+        if (success) {
+            switch (itemID) {
+                case 2049505: // Gold Potential Stamp
+                case 2049517:
+                    equip.setOption(2, equip.getRandomOption(false, 2), false);
+                    break;
+                default:
+                    chr.chatMessage("Unhandled slot extend item " + itemID);
+                    return;
+            }
+            equip.updateToChar(chr);
+        }
+        chr.consumeItem(item);
+        chr.announce(UserRemote.showItemUpgradeEffect(chr.getId(), success, false, itemID, equip.getItemId(), false));
+    }
+
+    public static void handlePotionOptionSetRequest(InPacket in, MapleClient c) {
+        MapleCharacter player = c.getPlayer();
+        PotionPot potionPot = player.getPotionPot();
+        boolean autoAddPotion = in.readByte() != 0;
+        boolean autoAddAlchemyPotion = in.readByte() != 0;
+        if (potionPot == null) {
+            return;
+        }
+        potionPot.setAutoAddPotion(autoAddPotion);
+        potionPot.setAutoAddPotion(autoAddAlchemyPotion);
+    }
+
+    public static void handleArcEnhanceRequest(InPacket in, MapleClient c) {
+        MapleCharacter chr = c.getPlayer();
+        int val = in.readInt();
+        ArcEnchantType type = ArcEnchantType.getEnchantTypeByVal(val);
+        if (type == null) {
+            chr.chatMessage(String.format("Unhandled ArcEnchantType val : %d \n content：%s", val, in));
+            return;
+        }
+        switch (type) {
+            case Absorbing_Single: {
+                int absorbedPos = in.readInt();
+                int toPos = in.readInt();
+                Equip absorbed = (Equip) chr.getEquipInventory().getItem(absorbedPos);
+                Equip equipped = (Equip) chr.getEquippedInventory().getItemByItemID(absorbed.getItemId());
+                if (equipped != null) {
+                    int arcExp = equipped.getArcExp();
+                    short arcLevel = equipped.getArcLevel();
+                    if (arcExp >= GameConstants.getArcUpgradeReqExp(arcLevel)) {
+                        return;
+                    }
+                    equipped.setArcExp(arcExp + absorbed.getArcLevel());
+                    chr.consumeItem(absorbed);
+                    equipped.updateToChar(chr);
+                }
+                break;
+            }
+            case Upgrade: {
+                int ePos = in.readInt();
+                Equip equipped = (Equip) chr.getEquippedInventory().getItem(ePos);
+                if (equipped == null) {
+                    return;
+                }
+                short arc = equipped.getArc();
+                int arcExp = equipped.getArcExp();
+                short lv = equipped.getArcLevel();
+                int reqExp = GameConstants.getArcUpgradeReqExp(lv);
+                if (arcExp < reqExp) {
+                    return;
+                }
+                int cost = GameConstants.getArcUpgradeCost(equipped.getItemId(), lv);
+                if (chr.getMeso() < cost) {
+                    return;
+                }
+                chr.deductMoney(cost);
+                equipped.setArcExp(arcExp - reqExp);
+                equipped.setArc((short) (arc + 10));
+                equipped.setArcLevel((short) (lv + 1));
+                //todo addStat
+                equipped.updateToChar(chr);
+                break;
+            }
+            case Absorbing_Multi: {
+                int arcItemID = in.readInt();
+                int unk = in.readInt();
+                int quantity = in.readInt();
+                Equip equipped = (Equip) chr.getEquippedInventory().getItemByItemID(arcItemID);
+                if (equipped == null) {
+                    return;
+                }
+                int arcExp = equipped.getArcExp();
+                short arcLevel = equipped.getArcLevel();
+                if (arcExp >= GameConstants.getArcUpgradeReqExp(arcLevel)) {
+                    return;
+                }
+                //todo
+                chr.consumeItem(arcItemID, quantity);
+                break;
+            }
+
+        }
     }
 }

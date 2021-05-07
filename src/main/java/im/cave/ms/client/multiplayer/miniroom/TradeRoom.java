@@ -106,7 +106,7 @@ public class TradeRoom implements MiniRoom {
         MapleCharacter chr = getChr();
         MapleCharacter other = getOther();
         // Ugly, but eh
-        // Check if the MapleCharacteracters have enough space for all the items
+        // Check if the MapleChar have enough space for all the items
         List<Item> items = new ArrayList<>();
         for (Tuple<Integer, Item> entry : getOfferedItems().get(other)) {
             items.add(entry.getRight());
@@ -144,7 +144,6 @@ public class TradeRoom implements MiniRoom {
             other.announce(MiniRoomPacket.cancelTrade(1));
         }
         restoreItems();
-
     }
 
     public MapleCharacter getOtherChar(MapleCharacter chr) {
@@ -170,5 +169,25 @@ public class TradeRoom implements MiniRoom {
             out.writeShort(chr.getJob());
         }
         out.write(-1);
+    }
+
+    @Override
+    public void close() {
+
+    }
+
+    @Override
+    public void invite(MapleCharacter inviter, MapleCharacter invitee) {
+
+    }
+
+    @Override
+    public void invite(MapleCharacter invitee) {
+
+    }
+
+    @Override
+    public void exit(MapleCharacter chr) {
+
     }
 }

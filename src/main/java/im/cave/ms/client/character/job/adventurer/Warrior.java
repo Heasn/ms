@@ -17,7 +17,6 @@ import im.cave.ms.connection.netty.InPacket;
 import im.cave.ms.connection.packet.MobPacket;
 import im.cave.ms.connection.packet.SummonPacket;
 import im.cave.ms.connection.packet.UserPacket;
-import im.cave.ms.connection.packet.UserRemote;
 import im.cave.ms.constants.JobConstants;
 import im.cave.ms.enums.AssistType;
 import im.cave.ms.enums.JobType;
@@ -32,57 +31,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.AsrR;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.AttackRecovery;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.BasicStatUp;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.Beholder;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.Booster;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.CombatOrders;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.ComboCostInc;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.ComboCounter;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.CrossOverChain;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.EMDD;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.EPAD;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.EPDD;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.ElementalCharge;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.Enrage;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.EnrageCrDam;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.Guard;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.IndieBDR;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.IndieCr;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.IndieDamR;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.IndieEmpty;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.IndieIgnoreMobpdpR;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.IndiePAD;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.IndiePDDR;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.IndiePMdR;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.MaxHP;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.MaxMP;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.PDD;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.PowerGuard;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.Restoration;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.Stance;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.TerR;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.WeaponCharge;
+import static im.cave.ms.client.character.temp.CharacterTemporaryStat.*;
 import static im.cave.ms.constants.QuestConstants.QUEST_EX_SKILL_STATE;
-import static im.cave.ms.enums.SkillStat.epad;
-import static im.cave.ms.enums.SkillStat.epdd;
-import static im.cave.ms.enums.SkillStat.hp;
-import static im.cave.ms.enums.SkillStat.indieBDR;
-import static im.cave.ms.enums.SkillStat.indieCr;
-import static im.cave.ms.enums.SkillStat.indieDamR;
-import static im.cave.ms.enums.SkillStat.indiePMdR;
-import static im.cave.ms.enums.SkillStat.indiePad;
-import static im.cave.ms.enums.SkillStat.indiePowerGuard;
-import static im.cave.ms.enums.SkillStat.pdd;
-import static im.cave.ms.enums.SkillStat.prop;
-import static im.cave.ms.enums.SkillStat.subTime;
-import static im.cave.ms.enums.SkillStat.time;
-import static im.cave.ms.enums.SkillStat.u;
-import static im.cave.ms.enums.SkillStat.w;
-import static im.cave.ms.enums.SkillStat.x;
-import static im.cave.ms.enums.SkillStat.y;
-import static im.cave.ms.enums.SkillStat.z;
+import static im.cave.ms.enums.SkillStat.*;
 
 /**
  * @author fair
@@ -201,10 +152,11 @@ public class Warrior extends Beginner {
     //  超级技能
     public static final int KNIGHT_DARK_THIRST = 1321054; //黑暗饥渴
 
-    public final AtomicInteger comboCount = new AtomicInteger(1);
+    private final AtomicInteger comboCount = new AtomicInteger(1);
     private Summon evilEye;
     private int lastCharge;
-    private static final int[] buffs = new int[]{
+
+    public static final int[] buffs = new int[]{
             HERO_WEAPON_BOOSTER,
             HERO_RAGE,
             HERO_COMBO_ATTACK,
@@ -227,7 +179,7 @@ public class Warrior extends Beginner {
             KNIGHT_SACRIFICE
     };
 
-    private static final int[] passive = new int[]{
+    public static final int[] passive = new int[]{
             IRON_BODY,
             WARRIOR_MASTERY,
             HERO_PHYSICAL_TRAINING
@@ -290,7 +242,7 @@ public class Warrior extends Beginner {
         Skill skill = player.getSkill(attackInfo.skillId);
         SkillInfo si;
         int slv = 0;
-        int skillId = 0;
+        int skillId;
         if (skill != null) {
             si = SkillData.getSkillInfo(attackInfo.skillId);
             slv = skill.getCurrentLevel();
@@ -312,22 +264,6 @@ public class Warrior extends Beginner {
         Option ooo = new Option();
         switch (attackInfo.skillId) {
             case HERO_PANIC:
-                if (tsm.hasStat(ComboCostInc)) {
-                    int amount = tsm.getOption(ComboCostInc).nOption;
-                    removeCombo(chr, 1 + amount);
-                    ooo.nOption = amount + 1;
-                    ooo.rOption = HERO_PANIC;
-                    ooo.tOption = si.getValue(subTime, slv);
-                    tsm.putCharacterStatValue(ComboCostInc, ooo);
-                    tsm.sendSetStatPacket();
-                } else {
-                    ooo.nOption = 1;
-                    ooo.rOption = HERO_PANIC;
-                    ooo.tOption = si.getValue(subTime, slv);
-                    tsm.putCharacterStatValue(ComboCostInc, ooo);
-                    tsm.sendSetStatPacket();
-                    removeCombo(chr, 1);
-                }
                 for (MobAttackInfo mobAttackInfo : attackInfo.mobAttackInfo) {
                     int objectId = mobAttackInfo.objectId;
                     MapleMap map = chr.getMap();
@@ -419,6 +355,7 @@ public class Warrior extends Beginner {
         } else {
             o.nOption = 0;
         }
+        comboCount.set(o.nOption);
         o.rOption = HERO_COMBO_ATTACK;
         tsm.putCharacterStatValue(ComboCounter, o);
         tsm.sendSetStatPacket();
@@ -769,7 +706,6 @@ public class Warrior extends Beginner {
             oo.rOption = skill.getSkillId();
             oo.tOption = si.getValue(time, slv);
             tsm.putCharacterStatValue(EPDD, ooo);
-            tsm.putCharacterStatValue(EMDD, ooo);
 
             ooo.nReason = skill.getSkillId();
             ooo.nValue = si.getValue(indieCr, slv);
@@ -788,5 +724,14 @@ public class Warrior extends Beginner {
         Set<JobType> jobs = JobType.getAllAdvancedJobs(JobType.WARRIOR.getJob());
         JobType job = JobType.getJobById(id);
         return job == JobType.WARRIOR || jobs.contains(job);
+    }
+
+    @Override
+    public int getFinalAttackSkill() {
+        return super.getFinalAttackSkill();
+    }
+
+    public AtomicInteger getComboCount() {
+        return comboCount;
     }
 }

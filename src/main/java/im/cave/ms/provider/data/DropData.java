@@ -1,7 +1,7 @@
 package im.cave.ms.provider.data;
 
-import im.cave.ms.provider.info.DropInfo;
 import im.cave.ms.connection.db.DataBaseManager;
+import im.cave.ms.provider.info.DropInfo;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.slf4j.Logger;
@@ -22,7 +22,6 @@ public class DropData {
     private static final Logger log = LoggerFactory.getLogger(DropData.class);
 
     private static final HashMap<Integer, Set<DropInfo>> drops = new HashMap<>();
-
 
     public static Set<DropInfo> getDrops(int mobId) {
         Set<DropInfo> mobDrops = drops.getOrDefault(mobId, null);

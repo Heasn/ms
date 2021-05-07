@@ -1,12 +1,18 @@
 package im.cave.ms.client.multiplayer.party;
 
+import im.cave.ms.client.character.ExpIncreaseInfo;
 import im.cave.ms.client.character.MapleCharacter;
 import im.cave.ms.client.field.MapleMap;
 import im.cave.ms.connection.netty.OutPacket;
+import im.cave.ms.connection.packet.UserPacket;
 import im.cave.ms.connection.packet.WorldPacket;
+import im.cave.ms.connection.server.Server;
 import im.cave.ms.connection.server.world.World;
 import im.cave.ms.constants.GameConstants;
+import im.cave.ms.enums.PartyQuestType;
 import im.cave.ms.provider.data.MapData;
+import im.cave.ms.tools.Pair;
+import im.cave.ms.tools.Util;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -21,13 +27,15 @@ import java.util.stream.Collectors;
 
 public class Party {
     private final PartyMember[] partyMembers = new PartyMember[6];
-    private final Map<Integer, MapleMap> maps = new HashMap<>();
+    private final Map<Integer, MapleMap> maps = new HashMap<>(); //组队地图
     private int id;
     private boolean appliable;
     private String name;
     private int partyLeaderId;
     private World world;
     private MapleCharacter applyingChar;
+    private List<Pair<MapleCharacter, Long>> invitedChars; //邀请的角色-邀请时间 防止重复邀请
+    private PartyQuest partyQuest; //当前组队进行的组队任务/BOSS
 
     public static Party createNewParty(boolean appliable, String name, World world) {
         Party party = new Party();
@@ -149,10 +157,10 @@ public class Party {
                 != partyLeaderId) {
             broadcast(WorldPacket.partyResult(PartyResult.joinParty(this, chr.getName())));
         }
-        updateHp();
+        updateAllMembersHp();
     }
 
-    private void updateHp() {
+    public void updateAllMembersHp() {
         List<MapleCharacter> onlineChar = getOnlineChar();
         for (MapleCharacter chr : onlineChar) {
             Set<MapleCharacter> membersInSameField = getPartyMembersInSameField(chr);
@@ -186,6 +194,7 @@ public class Party {
         Arrays.fill(getPartyMembers(), null);
         getWorld().removeParty(this);
         setWorld(null);
+        setInvitedChars(null);
     }
 
     public List<MapleCharacter> getOnlineChar() {
@@ -256,7 +265,7 @@ public class Party {
         this.world = world;
     }
 
-    public MapleCharacter getapplyingChar() {
+    public MapleCharacter getApplyingChar() {
         return applyingChar;
     }
 
@@ -272,8 +281,17 @@ public class Party {
         getMaps().put(field.getId(), field);
     }
 
+    public void warp(MapleMap map) {
+        for (PartyMember member : getOnlineMembers()) {
+            if (member.getPartyQuest() != null && !member.getPartyQuest().getMaps().contains(map)) {
+                member.setPartyQuest(null);
+            }
+            member.getChr().changeMap(map, 0);
+        }
+    }
+
     /**
-     * Clears the current Fields. Will return any MapleCharacteracter that is currently on any of the Fields to the Field's return field.
+     * Clears the current Fields. Will return any MapleCharacter that is currently on any of the Fields to the Field's return field.
      *
      * @param warpToId the field id that all MapleCharacters should be warped to
      */
@@ -307,6 +325,7 @@ public class Party {
         }
     }
 
+
     public boolean isPartyMember(MapleCharacter chr) {
         return getPartyMemberByID(chr.getId()) != null;
     }
@@ -335,7 +354,7 @@ public class Party {
      * Gets a list of party members in the same Field instance as the given MapleCharacter, excluding the given MapleCharacter.
      *
      * @param chr the given MapleCharacter
-     * @return a set of MapleCharacteracters that are in the same field as the given MapleCharacter
+     * @return a set of MapleCharacters that are in the same field as the given MapleCharacter
      */
     public Set<MapleCharacter> getPartyMembersInSameField(MapleCharacter chr) {
         return getOnlineMembers().stream()
@@ -361,4 +380,84 @@ public class Party {
         return pm != null ? pm.getTownPortal() : new TownPortal();
     }
 
+
+    public void giveExpInMaps(int exp, List<Integer> maps) {
+        for (MapleCharacter chr : getOnlineChar()) {
+            if (maps.contains(chr.getMapId())) {
+                chr.addExp(exp, null);
+            }
+        }
+    }
+
+    public void addInvitedChar(MapleCharacter chr) {
+        invitedChars.add(new Pair<>(chr, System.currentTimeMillis()));
+    }
+
+    public void setInvitedChars(List<Pair<MapleCharacter, Long>> invitedChars) {
+        this.invitedChars = invitedChars;
+    }
+
+    public List<Pair<MapleCharacter, Long>> getInvitedChars() {
+        return invitedChars;
+    }
+
+    public boolean hasInvited(MapleCharacter chr) {
+        for (Pair<MapleCharacter, Long> invitedChar : invitedChars) {
+            if (invitedChar.getLeft().equals(chr) && System.currentTimeMillis() - invitedChar.getRight() < 30000) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void removeInvited(MapleCharacter player) {
+        invitedChars.removeIf(ic -> ic.getLeft().equals(player));
+    }
+
+
+    public PartyQuest startPQ(PartyQuestType type) {
+        if (partyQuest != null) {
+            partyQuest.dispose();
+        }
+        PartyQuest partyQuest = new PartyQuest(type, this);
+        this.partyQuest = partyQuest;
+        for (PartyMember onlineMember : getOnlineMembers()) {
+            onlineMember.setPartyQuest(partyQuest);
+            onlineMember.getChr().cleanTemp();
+        }
+        getWorld().addPartyQuest(partyQuest);
+        return partyQuest;
+    }
+
+    public PartyQuest getPartyQuest() {
+        return partyQuest;
+    }
+
+    public void setPartyQuest(PartyQuest partyQuest) {
+        this.partyQuest = partyQuest;
+    }
+
+    public void giveExpInProgress(long amount) {
+        if (partyQuest == null) {
+            return;
+        }
+        for (PartyMember charInProgress : partyQuest.getCharInProgress()) {
+            ExpIncreaseInfo eii = new ExpIncreaseInfo();
+            eii.setLastHit(false);
+            eii.setIncEXP((int) amount);
+            eii.setOnQuest(false);
+            charInProgress.getChr().addExp(amount, eii);
+        }
+    }
+
+    public void setPQProgress(int progress) {
+        partyQuest.setProgress(progress);
+        for (PartyMember charInProgress : partyQuest.getCharInProgress()) {
+            charInProgress.getChr().announce(UserPacket.progress(progress));
+        }
+    }
+
+    public void removeMap(MapleMap map) {
+        maps.remove(map.getId(), map);
+    }
 }

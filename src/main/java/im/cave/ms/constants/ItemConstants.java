@@ -4,32 +4,17 @@ import im.cave.ms.client.character.items.Equip;
 import im.cave.ms.client.character.items.Item;
 import im.cave.ms.client.character.items.ItemOption;
 import im.cave.ms.client.character.items.ScrollUpgradeInfo;
-import im.cave.ms.provider.info.DropInfo;
-import im.cave.ms.enums.BodyPart;
-import im.cave.ms.enums.EnchantStat;
-import im.cave.ms.enums.EquipPrefix;
-import im.cave.ms.enums.InventoryType;
-import im.cave.ms.enums.ItemGrade;
-import im.cave.ms.enums.ItemOptionType;
-import im.cave.ms.enums.PetSkill;
-import im.cave.ms.enums.RequiredJob;
-import im.cave.ms.enums.ScrollStat;
-import im.cave.ms.enums.SpellTraceScrollType;
+import im.cave.ms.enums.*;
 import im.cave.ms.provider.data.ItemData;
+import im.cave.ms.provider.info.DropInfo;
 import im.cave.ms.provider.info.ItemInfo;
+import im.cave.ms.provider.info.SkillOption;
+import im.cave.ms.tools.Pair;
 import im.cave.ms.tools.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static im.cave.ms.enums.InventoryType.EQUIP;
@@ -61,6 +46,8 @@ public class ItemConstants {
     public static final short MIN_LEVEL_FOR_SOUL_SOCKET = 75;
     public static final int SOUL_ENCHANTER_BASE_ID = 2590000;
     public static final int SOUL_ITEM_BASE_ID = 2591000;
+    public static final int SOUL_CRYSTAL = 4001536;
+    public static final int SOUL_SKILL_PREPARED = 250;
     public static final int MAX_SOUL_CAPACITY = 1000;
     public static final int MOB_DEATH_SOUL_MP_COUNT = 150;
     public static final int MOB_CARD_BASE_ID = 2380000;
@@ -606,12 +593,12 @@ public class ItemConstants {
                 isPocketItem(equip.getItemId()));
     }
 
-//    public static boolean canEquipGoldHammer(Equip equip) {
-//        Equip defaultEquip = ItemData.getEquipById(equip.getItemId());
-//        return !(Arrays.asList(HORNTAIL_NECKLACE).contains(equip.getItemId()) ||
-//                equip.getIuc() >= defaultEquip.getIUCMax() ||
-//                defaultEquip.getTuc() <= 0); // No upgrade slots by default
-//    }
+    public static boolean canEquipGoldHammer(Equip equip) {
+        Equip defaultEquip = ItemData.getEquipById(equip.getItemId());
+        return !(Arrays.asList(HORNTAIL_NECKLACE).contains(equip.getItemId()) ||
+                equip.getIuc() >= defaultEquip.getIucMax() ||
+                defaultEquip.getTuc() <= 0); // No upgrade slots by default
+    }
 
     public static boolean isGoldHammer(Item item) {
         return getItemPrefix(item.getItemId()) == 247;
@@ -1542,31 +1529,13 @@ public class ItemConstants {
         return itemID / 1000 == 2591;
     }
 
-    public static short getSoulOptionFromSoul(int itemId) {
-        short id = 0;
-        switch (itemId) {
-
-        }
-        return id;
-    }
-
     public static int getRandomSoulOption() {
         return Util.getRandomFromCollection(soulPotList);
     }
 
     public static int getSoulSkillFromSoulID(int soulID) {
-        switch (soulID) {
-            case 256:
-            case 257:
-            case 258:
-            case 259:
-            case 260:
-            case 261:
-            case 262:
-            case 263:
-                return 80001340; // Advance of Magnus
-        }
-        return 0;
+        SkillOption skillOption = ItemData.getSkillOptionByOptionId(soulID);
+        return skillOption.getSkillId();
     }
 
     public static boolean isMobCard(int itemID) {
@@ -1852,6 +1821,12 @@ public class ItemConstants {
     public static Set<DropInfo> getConsumableMobDrops(int level) {
         level = Math.min(100, (level / 20) * 20);
         return consumableDropsPerLevel.getOrDefault(level, new HashSet<>());
+    }
+
+    public static short getSoulOptionFromSoul(short soulOptionId) {
+        SkillOption skillOption = ItemData.getSkillOptionByOptionId(soulOptionId);
+        List<Pair<Integer, Integer>> tempOptions = skillOption.getTempOptions();
+        return Util.randomPick(tempOptions).shortValue();
     }
 
 }

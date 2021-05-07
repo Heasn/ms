@@ -20,7 +20,7 @@ import java.util.List;
 /**
  * @author fair
  * @version V1.0
- * @Package im.cave.ms.net.handler.channel
+ * @Package im.cave.ms.net.handler.channelId
  * @date 11/29 15:52
  */
 public class MobHandler {
@@ -82,5 +82,61 @@ public class MobHandler {
             ms.handleEffect(mob);
         }
 
+    }
+
+    public static void handleMobEscortStopEndRequest(InPacket in, MapleClient c) {
+        int objId = in.readInt();
+        MapleCharacter player = c.getPlayer();
+        MapleMapObj obj = player.getMap().getObj(objId);
+        if (!(obj instanceof Mob)) {
+            return;
+        }
+        Mob mob = (Mob) obj;
+
+    }
+
+    public static void handleRequestEscortInfo(InPacket in, MapleClient c) {
+        int objId = in.readInt();
+        MapleCharacter player = c.getPlayer();
+        MapleMapObj obj = player.getMap().getObj(objId);
+        if (!(obj instanceof Mob)) {
+            return;
+        }
+        Mob mob = (Mob) obj;
+        if (mob.isEscortMob()) {
+            if (mob.getTemplateId() == 9300438) {
+                mob.addEscortDest(-1616, 233, -1);
+                mob.addEscortDest(1898, 233, 0);
+                mob.escortFullPath(-1);
+            }
+        }
+    }
+
+    public static void handleMobApplyCtrl(InPacket in, MapleClient c) {
+        int objId = in.readInt();
+        int templateId = in.readInt();
+        int unk = in.readInt();
+
+        MapleCharacter chr = c.getPlayer();
+        MapleMap map = chr.getMap();
+        Mob mob = (Mob) map.getObj(objId);
+        if (mob.getTemplateId() != templateId) {
+            return;
+        }
+        c.write(MobPacket.changeMobController(mob, true, true));
+    }
+
+    //todo
+    public static void handleMobAttackMob(InPacket in, MapleClient c) {
+        int attackerId = in.readInt();
+        int charId = in.readInt();
+        int AttackedId = in.readInt();
+        in.skip(3);
+        int damage = in.readInt();
+        in.readByte();
+        in.readInt(); //tick
+        in.readInt();
+        in.readPosition();
+        in.readByte();
     }
 }

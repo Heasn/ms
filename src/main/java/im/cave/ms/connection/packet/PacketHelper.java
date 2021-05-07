@@ -3,6 +3,7 @@ package im.cave.ms.connection.packet;
 import im.cave.ms.client.Account;
 import im.cave.ms.client.character.CharLook;
 import im.cave.ms.client.character.CharStats;
+import im.cave.ms.client.character.LinkSkill;
 import im.cave.ms.client.character.MapleCharacter;
 import im.cave.ms.client.character.items.Inventory;
 import im.cave.ms.client.character.items.Item;
@@ -70,7 +71,7 @@ public class PacketHelper {
     public static void addCharStats(OutPacket out, MapleCharacter chr) {
         out.writeInt(chr.getId());
         out.writeInt(chr.getId());
-        out.writeInt(chr.getWorld());
+        out.writeInt(chr.getWorldId());
         out.writeAsciiString(chr.getName(), 13);
         CharLook charLook = chr.getCharLook();
         out.write(charLook.getGender());
@@ -91,7 +92,7 @@ public class PacketHelper {
             out.writeInt(charLook.getMark());
         }
         out.write(0);
-        out.writeLong(ZERO_TIME);
+        out.writeLong(chr.getCreatedTime()); //角色创建时间
         out.writeShort(stats.getFatigue());
         out.writeInt(stats.getFatigueUpdated() == 0 ? DateUtil.getTime() : stats.getFatigueUpdated());
         /*
@@ -111,13 +112,18 @@ public class PacketHelper {
         out.write(10); //pvp grade
         out.writeInt(0); // pvp maplePoint
         out.write(5); // unk
-        out.write(5); // pvp mode type
+        out.write(6); // pvp mode type
         out.writeInt(0); //event maplePoint
 
-        out.writeReversedLong(chr.getLastLogout());
-        out.writeLong(MAX_TIME);
-        out.writeLong(ZERO_TIME);
+        out.writeReversedLong(DateUtil.getFileTime(System.currentTimeMillis()));
+        out.writeLong(MAX_TIME); //斗燃开始时间
+        out.writeLong(ZERO_TIME); //陡然结束时间
         out.writeZeroBytes(14);
+        //斗燃
+        //begin level
+        //end level
+        //00 00 00 00
+        //02 00 level added
         out.writeInt(-1);
         out.writeInt(0); //bBurning
     }
@@ -168,12 +174,12 @@ public class PacketHelper {
             chr.getPotionPot().encode(out);
         }
         //背包容量
-        out.write(chr.getInventory(InventoryType.EQUIP).getSlots());
-        out.write(chr.getInventory(InventoryType.CONSUME).getSlots());
-        out.write(chr.getInventory(InventoryType.INSTALL).getSlots());
-        out.write(chr.getInventory(InventoryType.ETC).getSlots());
-        out.write(chr.getInventory(InventoryType.CASH).getSlots());
-        out.write(chr.getInventory(InventoryType.CASH_EQUIP).getSlots());
+        out.writeInt(chr.getInventory(InventoryType.EQUIP).getSlots());
+        out.writeInt(chr.getInventory(InventoryType.CONSUME).getSlots());
+        out.writeInt(chr.getInventory(InventoryType.INSTALL).getSlots());
+        out.writeInt(chr.getInventory(InventoryType.ETC).getSlots());
+        out.writeInt(chr.getInventory(InventoryType.CASH).getSlots());
+        out.writeInt(chr.getInventory(InventoryType.CASH_EQUIP).getSlots());
 
         if (chr.getExtendedPendant() > 0 && chr.getExtendedPendant() > DateUtil.getFileTime(System.currentTimeMillis())) {
             out.writeLong(chr.getExtendedPendant());
@@ -202,23 +208,37 @@ public class PacketHelper {
         out.writeInt(1);
         out.writeInt(chr.getAccId());
         out.writeInt(-1);
-        out.writeInt(0);
-        for (int i = 0; i < 20; i++) {
+
+
+        out.writeShort(0);// ShopBuyLimit
+        //01 00
+        //03 00
+        //9010109
+        //9010109
+        //06 00
+        //2023660
+        //03 00
+        //time
+
+        out.writeShort(0);//Unk5
+
+
+        for (int i = 0; i < 20; i++) { //StolenSkills and ChosenSkills
             out.writeInt(0);
         }
         //内在能力
-        out.writeShort(chr.getPotentials().size());
+        out.writeShort(chr.getPotentials().size()); //CharacterPotentialSkill
         for (CharacterPotential characterPotential : chr.getPotentials()) {
             characterPotential.encode(out);
         }
 
-        out.writeShort(0);
+        out.writeShort(0); //Character
         out.writeInt(1); //荣耀等级
         out.writeInt(chr.getStats().getHonerPoint()); // 声望
         out.write(1);
         out.writeShort(0);
         out.write(0);
-        // 天使变身外观
+        // 天使变身外观//DressUpInfo
         out.writeInt(0);
         out.writeInt(0);
         out.writeInt(0);
@@ -238,6 +258,7 @@ public class PacketHelper {
         out.writeInt(chr.getId());
         out.writeZeroBytes(12);
         out.writeLong(ZERO_TIME);
+
         out.writeInt(0x0A); // xxx size
         out.writeZeroBytes(20); // xxx
 
@@ -250,12 +271,25 @@ public class PacketHelper {
             out.writeMapleAsciiString(qrValue);
         });
 
-        out.writeShort(0); //unk size
+        out.writeShort(0); //未知Quest数据 可能是小屋
+        //100000
+        //0=800004000000000000000000000000000000000000000000
 
         out.writeZeroBytes(7);
         out.writeInt(0); //五转核心数目
+        //idx
+        //201327833
+        //sn
+        //level
+        //0
+        //2
+        //skillId
+        //8个0
+        //位置序号
+        //max_TIme
 
-        //未知
+
+        //未知 可能和五转的强化有关
         int ffff = 20;
         out.writeInt(ffff);
         for (int i = 0; i < ffff; i++) {
@@ -270,8 +304,9 @@ public class PacketHelper {
         out.writeLong(ZERO_TIME);
         //todo
         out.writeZeroBytes(82); //幻影窃取的技能
-        //00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 08 00 00 00 00 00 00 00 00 00 00 00 00
-
+        //00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+        // 08 00 00 00 00 00 00 00 00 00 00 00 00
+        //还有个8？
 
         out.writeShort(ItemConstants.COMMODITY.length);
         long time = DateUtil.getFileTime(System.currentTimeMillis());
@@ -298,7 +333,7 @@ public class PacketHelper {
 
         out.write(0);
         out.write(0);
-        out.write(1);
+        out.write(0);
     }
 
     private static void addTRocksInfo(OutPacket out, MapleCharacter chr) {
@@ -341,8 +376,8 @@ public class PacketHelper {
     }
 
     private static void addSkillInfo(OutPacket out, MapleCharacter chr) {
-        out.write(1); //mask
-//        out.writeShort(0); // skills size       short size = (short) (getSkills().size() + linkSkills.size());
+        out.write(1);
+        // skills size       short size = (short) (getSkills().size() + linkSkills.size());
         Set<Skill> skills = chr.getSkills();
         out.writeShort(skills.size());
         for (Skill skill : skills) {
@@ -354,11 +389,25 @@ public class PacketHelper {
             }
         }
 
-        out.writeShort(0); //link skill
+        out.writeShort(0); //link skill 获得的LINk技能
 
-        out.writeInt(0); //son of linked skill
-
-        out.writeShort(0); //skills in cd  size
+        Account account = chr.getAccount();
+        Set<LinkSkill> linkSkills = account.getLinkSkills(); //是否要排除自己？
+        out.writeInt(linkSkills.size()); //所有的LINK数量
+        for (LinkSkill linkSkill : linkSkills) {
+            linkSkill.encode(out);
+        }
+        Map<Integer, Long> skillCooltimes = chr.getSkillCooltimes();
+        out.writeShort(skillCooltimes.size());
+        long now = System.currentTimeMillis();
+        for (Integer skillId : skillCooltimes.keySet()) {
+            Long nextUsableTime = skillCooltimes.getOrDefault(skillId, 0L);
+            if (nextUsableTime <= now) {
+                continue;
+            }
+            out.writeInt(skillId);
+            out.writeInt((int) ((nextUsableTime - now) / 1000));
+        }
     }
 
     private static void addInventoryInfo(OutPacket out, MapleCharacter chr) {
@@ -407,53 +456,46 @@ public class PacketHelper {
                 virtualEquip.add(item);
             }
         }
+        //normalEquip
         for (Item item : normalEquip) {
             out.writeShort(item.getPos());
             item.encode(out);
         }
-        out.writeShort(0);  //装备
-
+        out.writeShort(0);
+        //invEquip
         for (Item item : chr.getInventory(InventoryType.EQUIP).getItems()) {
             out.writeShort(item.getPos());
             item.encode(out);
         }
-        out.writeShort(0); //装备栏
-/////////////////////////////////////////////
+        out.writeShort(0);
+        //evanEquip
         for (Item item : evanEquip) {
             out.writeShort(item.getPos());
             item.encode(out);
         }
         out.writeShort(0);
-
-        for (Item item : petConsumeEquip) {
-            out.writeShort(item.getPos());
-            item.encode(out);
-        }
+        //Unknown
+//        for (Item item : petConsumeEquip) {
+//            out.writeShort(item.getPos());
+//            item.encode(out);
+//        }
         out.writeShort(0);
-///////////////////////////////
+        //totemEquip
         for (Item item : totems) {
             out.writeShort(item.getPos());
             item.encode(out);
         }
         out.writeShort(0);
-///////////////////////////////
-        //todo
+        /////////////////////
         out.writeShort(0); //1
-        //todo
         out.writeShort(0); //2
-        //todo
         out.writeShort(0); //3
-        //todo
         out.writeShort(0); //4
-        //todo
         out.writeShort(0); //5
-        //todo
         out.writeShort(0); //6
-        //todo
         out.writeShort(0); //7
         ////////////////////
-        //机器人
-        //todo
+        //todo 机器人
         out.writeInt(0); //背包中机器人的数目...
         //60 C8 8E 26 00 00 00 00 id
         //0a 00 type
@@ -463,12 +505,11 @@ public class PacketHelper {
         // 12个0
         ///////////////////////////
 
-        //todo
         out.writeShort(0); //8
-        //todo
         out.writeShort(0); //9
 
         out.write(0);
+        //包括宠物的装备
         for (Item item : cashEquip) {
             out.writeShort(item.getPos() - 100);
             item.encode(out);
@@ -479,16 +520,14 @@ public class PacketHelper {
             item.encode(out);
         }
         out.writeShort(0);
-        //todo
+        //安卓机器人的装备
         for (Item item : androidEquip) {
             out.writeShort(item.getPos());
             item.encode(out);
         }
         out.writeShort(0);
 
-        //todo
         out.writeShort(0);
-        //todo
         out.writeShort(0);
 
         for (Item item : chr.getConsumeInventory().getItems()) {

@@ -7,12 +7,8 @@ worlds:
     exp_rate: 10
     meso_rate: 10
     drop_rate: 10
-    boss_drop_rate: 10
-    quest_rate: 5
-    fishing_rate: 10
-    travel_rate: 10
 
-signin:
+dailyGifts:
   - rank: 1
     itemId: 2049116
     quantity: 10
@@ -97,11 +93,5 @@ signin:
     itemId: 2049116
     quantity: 10
   - rank: 28
-    itemId: 2049116
-    quantity: 10
-  - rank: 29
-    itemId: 2049116
-    quantity: 10
-  - rank: 30
     itemId: 2049116
     quantity: 10

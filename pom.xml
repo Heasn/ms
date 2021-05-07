@@ -6,8 +6,8 @@
     <artifactId>ms</artifactId>
     <version>1.0.2</version>
     <packaging>jar</packaging>
-    <name>maplestory</name>
-    <description>maplestory emulator</description>
+    <name>MapleServer</name>
+    <description>Open-source MapleStory server emulation software</description>
     <build>
         <plugins>
             <plugin>
@@ -77,11 +77,6 @@
             <groupId>org.hibernate</groupId>
             <artifactId>hibernate-hikaricp</artifactId>
             <version>5.4.10.Final</version>
-        </dependency>
-        <dependency>
-            <groupId>com.zaxxer</groupId>
-            <artifactId>HikariCP</artifactId>
-            <version>3.4.5</version>
         </dependency>
 
         <dependency>

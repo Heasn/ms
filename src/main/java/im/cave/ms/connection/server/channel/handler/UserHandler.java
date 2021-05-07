@@ -2,25 +2,12 @@ package im.cave.ms.connection.server.channel.handler;
 
 import im.cave.ms.client.Account;
 import im.cave.ms.client.MapleClient;
-import im.cave.ms.client.Record;
-import im.cave.ms.client.RecordManager;
-import im.cave.ms.client.character.DamageSkinSaveData;
-import im.cave.ms.client.character.Macro;
-import im.cave.ms.client.character.MapleCharacter;
-import im.cave.ms.client.character.MapleKeyMap;
-import im.cave.ms.client.character.Stat;
-import im.cave.ms.client.character.items.Equip;
-import im.cave.ms.client.character.items.Inventory;
-import im.cave.ms.client.character.items.Item;
-import im.cave.ms.client.character.items.PotionPot;
-import im.cave.ms.client.character.items.WishedItem;
+import im.cave.ms.client.character.*;
+import im.cave.ms.client.character.items.*;
 import im.cave.ms.client.character.job.MapleJob;
 import im.cave.ms.client.character.potential.CharacterPotential;
 import im.cave.ms.client.character.potential.CharacterPotentialMan;
-import im.cave.ms.client.character.skill.AttackInfo;
-import im.cave.ms.client.character.skill.HitInfo;
-import im.cave.ms.client.character.skill.MobAttackInfo;
-import im.cave.ms.client.character.skill.Skill;
+import im.cave.ms.client.character.skill.*;
 import im.cave.ms.client.character.temp.TemporaryStatManager;
 import im.cave.ms.client.field.Effect;
 import im.cave.ms.client.field.MapleMap;
@@ -29,70 +16,46 @@ import im.cave.ms.client.field.movement.MovementInfo;
 import im.cave.ms.client.field.obj.Android;
 import im.cave.ms.client.field.obj.Drop;
 import im.cave.ms.client.field.obj.MapleMapObj;
+import im.cave.ms.client.field.obj.Reactor;
 import im.cave.ms.client.field.obj.mob.Mob;
 import im.cave.ms.client.multiplayer.party.PartyMember;
 import im.cave.ms.client.storage.Locker;
 import im.cave.ms.connection.netty.InPacket;
-import im.cave.ms.connection.packet.CashShopPacket;
-import im.cave.ms.connection.packet.MessagePacket;
-import im.cave.ms.connection.packet.UserPacket;
-import im.cave.ms.connection.packet.UserRemote;
-import im.cave.ms.connection.packet.WorldPacket;
+import im.cave.ms.connection.packet.*;
 import im.cave.ms.connection.packet.opcode.RecvOpcode;
+import im.cave.ms.connection.packet.result.FameResult;
 import im.cave.ms.connection.server.Server;
 import im.cave.ms.connection.server.cashshop.CashShopServer;
-import im.cave.ms.connection.server.channel.MapleChannel;
-import im.cave.ms.constants.GameConstants;
-import im.cave.ms.constants.ItemConstants;
-import im.cave.ms.constants.JobConstants;
-import im.cave.ms.constants.QuestConstants;
-import im.cave.ms.constants.SkillConstants;
-import im.cave.ms.enums.CashItemType;
-import im.cave.ms.enums.CashShopCurrencyType;
-import im.cave.ms.enums.CharPotGrade;
-import im.cave.ms.enums.ChatType;
-import im.cave.ms.enums.DamageSkinType;
-import im.cave.ms.enums.DropLeaveType;
-import im.cave.ms.enums.InventoryType;
-import im.cave.ms.enums.LoginStatus;
-import im.cave.ms.enums.MapTransferType;
-import im.cave.ms.enums.RecordType;
-import im.cave.ms.enums.BroadcastMsgType;
+import im.cave.ms.constants.*;
+import im.cave.ms.enums.*;
 import im.cave.ms.provider.data.ItemData;
 import im.cave.ms.provider.data.SkillData;
+import im.cave.ms.provider.data.VCoreData;
 import im.cave.ms.provider.info.AndroidInfo;
 import im.cave.ms.provider.info.CashItemInfo;
 import im.cave.ms.provider.info.SkillInfo;
+import im.cave.ms.provider.info.VCore;
 import im.cave.ms.tools.DateUtil;
+import im.cave.ms.tools.Pair;
 import im.cave.ms.tools.Position;
 import im.cave.ms.tools.Rect;
-import im.cave.ms.tools.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
-import static im.cave.ms.connection.packet.opcode.RecvOpcode.CLOSE_RANGE_ATTACK;
-import static im.cave.ms.connection.packet.opcode.RecvOpcode.MAGIC_ATTACK;
-import static im.cave.ms.connection.packet.opcode.RecvOpcode.RANGED_ATTACK;
+import static im.cave.ms.client.character.temp.CharacterTemporaryStat.KeyDownMoving;
+import static im.cave.ms.connection.packet.opcode.RecvOpcode.*;
 import static im.cave.ms.constants.GameConstants.QUICKSLOT_SIZE;
-import static im.cave.ms.constants.QuestConstants.QUEST_EX_NICK_ITEM;
-import static im.cave.ms.constants.QuestConstants.QUEST_EX_SOUL_EFFECT;
+import static im.cave.ms.constants.QuestConstants.*;
 import static im.cave.ms.constants.ServerConstants.ONE_DAY_TIMES;
 
 /**
  * @author fair
  * @version V1.0
- * @Package im.cave.ms.net.handler.channel
+ * @Package im.cave.ms.net.handler.channelId
  * @date 12/1 14:59
  */
 public class UserHandler {
@@ -131,11 +94,19 @@ public class UserHandler {
         }
         player.setStat(Stat.HP, newHp);
         stats.put(Stat.HP, (long) newHp);
-        c.announce(UserPacket.updatePlayerStats(stats, player));
+        c.announce(UserPacket.statChanged(stats, player));
+        if (player.getParty() != null) {
+            player.updatePartyHpBar();
+        }
         player.getMap().broadcastMessage(player, UserRemote.hit(player, hitInfo), false);
 
     }
 
+    /*
+        USER_SHOOT_ATTACK @
+        USER_MELEE_ATTACK @
+
+     */
     public static void handleAttack(InPacket in, MapleClient c, RecvOpcode opcode) {
         MapleCharacter player = c.getPlayer();
         if (player == null) {
@@ -143,7 +114,7 @@ public class UserHandler {
         }
         AttackInfo attackInfo = new AttackInfo();
         attackInfo.attackHeader = opcode;
-        if (opcode == RANGED_ATTACK) {
+        if (opcode == USER_SHOOT_ATTACK) {
             attackInfo.boxAttack = in.readByte() != 0;
         }
         attackInfo.fieldKey = in.readByte(); //map key
@@ -153,54 +124,69 @@ public class UserHandler {
         in.readInt(); //00 00 00 00
         attackInfo.skillId = in.readInt();
         attackInfo.skillLevel = in.readInt();
-        in.readLong(); // crc
-        if (attackInfo.attackHeader != MAGIC_ATTACK) {
-            in.readByte();//unk
-        }
+        in.readByte();
+        in.readLong(); // CRC USER_MELEE_ATTACK = 0
+
+        /*
+            0A A1 36 22
+            00
+            01 00
+            00 00 00 00
+            00 00 00 00
+            00 00 00 00
+         */
         in.skip(18);
-        Position position = in.readPositionInt();
+        if (attackInfo.attackHeader != USER_MAGIC_ATTACK) {
+            in.readByte();//unk 00
+        }
+
+        Position position = in.readPositionInt(); //mob pos
 
         in.readLong(); // 00 00 00 00
-        in.readInt(); // 8E B1 05 5F 固定的
-        in.skip(3);
-        if (attackInfo.attackHeader == RANGED_ATTACK) {
+        in.readInt(); //  00 00 00 00
+        in.readInt(); // CRC
+        if (attackInfo.skillId == player.getPrepareSkill().getLeft()) {
+            in.readInt();//如果是按压技能的话
+        }
+        in.skip(3); // 00 00 00
+        if (attackInfo.attackHeader == USER_SHOOT_ATTACK) {
             in.readInt();
             in.readByte();
         }
         attackInfo.attackAction = in.readByte();
-        attackInfo.direction = in.readByte();
+        attackInfo.direction = in.readByte(); // left:0x80 right:0x00
         attackInfo.requestTime = in.readInt();
         attackInfo.attackActionType = in.readByte(); // 武器类型
         attackInfo.attackSpeed = in.readByte();
         player.setTick(in.readInt());
-        in.readInt();
-        if (attackInfo.attackHeader == CLOSE_RANGE_ATTACK) {
-            in.readInt();
+        in.readInt(); //00 00 00 00
+        if (attackInfo.attackHeader == USER_MELEE_ATTACK) {
+            in.readInt(); //00 00 00 00
         }
-        if (attackInfo.attackHeader == RANGED_ATTACK) {
+        if (attackInfo.attackHeader == USER_SHOOT_ATTACK) {
             in.readInt(); // 00
             in.readShort(); // 00
-            in.readByte(); // 30
+            in.readByte(); // 1E
             attackInfo.rect = in.readShortRect();
         }
         for (int i = 0; i < attackInfo.mobCount; i++) {
             MobAttackInfo mobAttackInfo = new MobAttackInfo();
             mobAttackInfo.objectId = in.readInt();
             mobAttackInfo.hitAction = in.readByte();
-            in.readShort();
+            in.readShort(); //00 00
             mobAttackInfo.left = in.readByte();
-            in.readByte();
+            in.readByte(); //03
             mobAttackInfo.templateID = in.readInt();
             mobAttackInfo.calcDamageStatIndex = in.readByte();
-            mobAttackInfo.hitX = in.readShort();
+            mobAttackInfo.hitX = in.readShort(); //MOB pos
             mobAttackInfo.hitY = in.readShort();
             in.readShort(); //x
             in.readShort(); //y
-            if (attackInfo.attackHeader == MAGIC_ATTACK) {
+            if (attackInfo.attackHeader == USER_MAGIC_ATTACK) {
                 mobAttackInfo.hpPerc = in.readByte();
                 short unk = in.readShort(); //unk
             } else {
-                byte unk1 = in.readByte();
+                short interval = in.readShort();
                 byte unk2 = in.readByte(); //1 正常 2 趴着
             }
             in.readLong(); // 00
@@ -209,7 +195,7 @@ public class UserHandler {
                 mobAttackInfo.damages[j] = in.readLong();
             }
             in.readInt(); // 00 00 00 00
-            in.readInt(); // crc 7C 45 9E 38
+            in.readInt(); // crc
             mobAttackInfo.type = in.readByte();
             if (mobAttackInfo.type == 1) {
                 mobAttackInfo.currentAnimationName = in.readMapleAsciiString();
@@ -226,6 +212,7 @@ public class UserHandler {
             in.skip(18); //unk pos
             attackInfo.mobAttackInfo.add(mobAttackInfo);
         }
+        Position pos = in.readPosition();
         player.getJobHandler().handleAttack(c, attackInfo);
         handleAttack(c, attackInfo);
     }
@@ -243,9 +230,9 @@ public class UserHandler {
         }
         if (attackInfo.attackHeader != null) {
             switch (attackInfo.attackHeader) {
-//                case SUMMONED_ATTACK:
-//                    chr.getField().broadcastPacket(Summoned.summonedAttack(chr.getId(), attackInfo, false), chr);
-//                    break;
+                case SUMMON_ATTACK:
+                    player.getMap().broadcastMessage(player, SummonPacket.summonAttack(player.getId(), attackInfo, false), false);
+                    break;
 //                case FAMILIAR_ATTACK:
 //                    chr.getField().broadcastPacket(CFamiliar.familiarAttack(chr.getId(), attackInfo), chr);
 //                    break;
@@ -302,46 +289,6 @@ public class UserHandler {
         player.getMap().broadcastMessage(player, UserPacket.move(player, movementInfo), false);
     }
 
-    public static void handleWorldMapTransfer(InPacket in, MapleClient c) {
-        MapleCharacter player = c.getPlayer();
-        if (player == null) {
-            return;
-        }
-        player.setTick(in.readInt());
-        int mapId = in.readInt();
-        MapleChannel channel = c.getMapleChannel();
-        MapleMap map = channel.getMap(mapId);
-        if (map == null) {
-            player.announce(WorldPacket.mapTransferResult(MapTransferType.TargetNotExist, (byte) 0, null));
-            return;
-        } else if (map == player.getMap()) {
-            player.announce(WorldPacket.mapTransferResult(MapTransferType.AlreadyInMap, (byte) 0, null));
-            return;
-        }
-        RecordManager recordManager = player.getRecordManager();
-        Record cash = recordManager.getRecord(RecordType.MAP_TRANSFER_COUPON_CASH);
-        Record free = recordManager.getRecord(RecordType.MAP_TRANSFER_COUPON_FREE);
-        if (free == null) {
-            free = new Record(RecordType.MAP_TRANSFER_COUPON_FREE, 7);
-            recordManager.addRecord(free);
-        }
-        boolean success = false;
-        if (free.getValue() >= 1) {
-            free.setValue(free.getValue() - 1);
-            success = true;
-        } else if (cash != null && cash.getValue() >= 1) {
-            cash.setValue(cash.getValue() - 1);
-            success = true;
-        }
-        if (success) {
-            player.announce(UserPacket.remainingMapTransferCoupon(player));
-            player.changeMap(map.getId());
-        } else {
-            player.announce(WorldPacket.mapTransferResult(MapTransferType.Unknown, (byte) 0, null));
-            player.enableAction();
-        }
-    }
-
     //打开角色的信息面板
     public static void handleCharInfoReq(InPacket in, MapleClient c) {
         MapleCharacter player = c.getPlayer();
@@ -358,7 +305,7 @@ public class UserHandler {
         c.announce(UserRemote.charInfo(chr));
     }
 
-    //取消椅子
+    // cancel portableChair / sit townChair
     public static void handleUserSitRequest(InPacket in, MapleClient c) {
         MapleCharacter player = c.getPlayer();
         if (player == null) {
@@ -367,15 +314,18 @@ public class UserHandler {
         short fieldSeatId = in.readShort();
         player.setChairId(fieldSeatId);
         c.announce(UserPacket.sitResult(player.getId(), fieldSeatId));
-        player.getMap().broadcastMessage(player, UserRemote.remoteSetActivePortableChair(player.getId(), 0, 0, (short) 0, 0, (byte) 0), false);
+        player.getMap().broadcastMessage(player, UserRemote.remoteSetActivePortableChair(player.getId(), new PortableChair()), false);
     }
 
     public static void handleUserPortableChairSitRequest(InPacket in, MapleClient c) {
+        MapleCharacter chr = c.getPlayer();
         int mapId = in.readInt();
+        //todo check map limit
         int chairId = in.readInt();
-        int pos = in.readByte();
-        boolean textChair = in.readInt() != 0;
+        int emotion = in.readByte();
+        in.readInt();
         Position position = in.readPositionInt();
+        String msg = in.readMapleAsciiString();
         in.readInt();
         int unk1 = in.readInt();
         short unk2 = in.readShort();
@@ -384,8 +334,8 @@ public class UserHandler {
         byte unk4 = in.readByte();
         c.announce(UserPacket.enableActions());
         c.announce(UserPacket.userSit());
-        MapleCharacter player = c.getPlayer();
-        player.getMap().broadcastMessage(player, UserRemote.remoteSetActivePortableChair(player.getId(), chairId, unk1, unk2, unk3, unk4), false);
+        PortableChair portableChair = new PortableChair();
+        chr.getMap().broadcastMessage(chr, UserRemote.remoteSetActivePortableChair(chr.getId(), portableChair), false);
     }
 
     /*
@@ -471,7 +421,7 @@ public class UserHandler {
             }
         }
 
-        c.announce(UserPacket.updatePlayerStats(stats, player));
+        c.announce(UserPacket.statChanged(stats, player));
         player.addSkill(skill);
         c.announce(UserPacket.changeSkillRecordResult(skill));
 
@@ -519,10 +469,16 @@ public class UserHandler {
         }
     }
 
-    public static void handleCancelBuff(InPacket in, MapleClient c) {
+    //取消技能
+    public static void handleUserSkillCancel(InPacket in, MapleClient c) {
         int skillId = in.readInt();
-        in.readByte();
         MapleCharacter player = c.getPlayer();
+        Pair<Integer, Integer> prepareSkill = player.getPrepareSkill();
+        if (prepareSkill != null && skillId == prepareSkill.getLeft()) {
+            player.setSkillCooltime(skillId, prepareSkill.getRight());
+            return;
+        }
+        in.readByte();
         TemporaryStatManager tsm = player.getTemporaryStatManager();
         tsm.removeStatsBySkill(skillId);
     }
@@ -598,7 +554,7 @@ public class UserHandler {
                 aKeys.add(in.readInt());
             }
         }
-        player.setQuickslots(aKeys);
+        player.setQuickSlots(aKeys);
     }
 
     public static void handleChangeKeyMap(InPacket in, MapleClient c) {
@@ -637,7 +593,7 @@ public class UserHandler {
         Map<Stat, Long> stats = new HashMap<>();
         stats.put(charStat, player.getStat(charStat));
         stats.put(Stat.AVAILABLEAP, player.getStat(Stat.AVAILABLEAP));
-        c.announce(UserPacket.updatePlayerStats(stats, true, player));
+        c.announce(UserPacket.statChanged(stats, true, player));
     }
 
     public static void handleAPMassUpdateRequest(InPacket in, MapleClient c) {
@@ -673,30 +629,31 @@ public class UserHandler {
         Map<Stat, Long> stats = new HashMap<>();
         stats.put(charStat, player.getStat(charStat));
         stats.put(Stat.AVAILABLEAP, player.getStat(Stat.AVAILABLEAP));
-        c.announce(UserPacket.updatePlayerStats(stats, true, player));
+        c.announce(UserPacket.statChanged(stats, true, player));
     }
 
-    //内在能力
-    public static void handleUserRequestCharacterPotentialSkillRandSetUi(InPacket in, MapleClient c) {
+    //内在能力重置
+    public static void handleUserRequestCharacterPotentialSkillRandSetUI(InPacket in, MapleClient c) {
         MapleCharacter player = c.getPlayer();
         if (player == null) {
             return;
         }
         int cost = GameConstants.CHAR_POT_RESET_COST;
-        int rate = in.readInt();
-        int size = in.readInt();
-        Set<Integer> lockedLines = new HashSet<>();
-        for (int i = 0; i < size; i++) {
-            lockedLines.add(in.readInt());
-            if (lockedLines.size() == 0) {
-                cost += GameConstants.CHAR_POT_LOCK_1_COST;
-            } else {
-                cost += GameConstants.CHAR_POT_LOCK_2_COST;
-            }
-        }
+        int rate = in.readInt(); //锁定的等级
         boolean locked = rate > 0;
+        Set<Byte> lockedLines = null;
         if (locked) {
-            cost += GameConstants.CHAR_POT_GRADE_LOCK_COST;
+            lockedLines = new HashSet<>();
+            cost += GameConstants.getCharPotGradeLockCost(rate);
+            int size = in.readInt();
+            for (int i = 0; i < size; i++) {
+                lockedLines.add((byte) in.readInt());
+                if (lockedLines.size() == 0) {
+                    cost += GameConstants.CHAR_POT_LOCK_1_COST;
+                } else {
+                    cost += GameConstants.CHAR_POT_LOCK_2_COST;
+                }
+            }
         }
         if (cost > player.getHonerPoint()) {
             player.chatMessage("You do not have enough honor exp for that action.");
@@ -705,27 +662,17 @@ public class UserHandler {
         player.addHonerPoint(-cost);
 
         CharacterPotentialMan cpm = player.getPotentialMan();
-        boolean gradeUp = !locked && Util.succeedProp(GameConstants.BASE_CHAR_POT_UP_RATE);
-        boolean gradeDown = !locked && Util.succeedProp(GameConstants.BASE_CHAR_POT_DOWN_RATE);
-        byte grade = cpm.getGrade();
-        // update grades
-        if (grade < CharPotGrade.Legendary.ordinal() && gradeUp) {
-            grade++;
-        } else if (grade > CharPotGrade.Rare.ordinal() && gradeDown) {
-            grade--;
-        }
-        // set new potentials that weren't locked
-        for (CharacterPotential cp : player.getPotentials()) {
-            cp.setGrade(grade);
-            if (!lockedLines.contains((int) cp.getKey())) {
-                cpm.addPotential(cpm.generateRandomPotential(cp.getKey()));
-            }
+        Set<CharacterPotential> potentials = cpm.randomizer(lockedLines, CharPotGrade.Rare.ordinal());
+        int i = 0;
+        for (CharacterPotential potential : potentials) {
+            ++i;
+            cpm.addPotential(potential, i == potentials.size());
         }
         c.announce(UserPacket.noticeMsg("内在能力重新设置成功。"));
     }
 
     public static void handleUserDamageSkinSaveRequest(InPacket in, MapleClient c) {
-        boolean delete = in.readByte() != 0; //unk
+        boolean delete = in.readByte() != 0; //type
         MapleCharacter player = c.getPlayer();
         DamageSkinSaveData damageSkin = player.getDamageSkin();
         DamageSkinType error = null;
@@ -740,11 +687,14 @@ public class UserHandler {
                 player.announce(UserPacket.damageSkinSaveResult(DamageSkinType.DamageSkinSaveReq_Active,
                         DamageSkinType.DamageSkinSave_Success, player));
             } else {
-                int skinId = in.readInt();
+                int skinId = in.readInt(); // 1
                 player.getDamageSkins().removeIf(dk -> dk.getDamageSkinID() == skinId);
                 player.announce(UserPacket.damageSkinSaveResult(DamageSkinType.DamageSkinSaveReq_Remove,
                         DamageSkinType.DamageSkinSave_Success, player));
             }
+
+            // val =  2
+            // in.readShort();
         }
     }
 
@@ -789,7 +739,7 @@ public class UserHandler {
         }
         if (in.available() == 0) {
             c.setLoginStatus(LoginStatus.SERVER_TRANSITION);
-            player.changeChannel((byte) player.getChannel());
+            player.changeChannel((byte) player.getChannelId());
             return;
         }
         if (in.available() != 0) {
@@ -798,6 +748,11 @@ public class UserHandler {
             String portalName = in.readMapleAsciiString();
             if (portalName != null && !"".equals(portalName)) {
                 Portal portal = player.getMap().getPortal(portalName);
+                if (portal == null) {
+                    //Hack
+                    player.changeMap(100000000);
+                    return;
+                }
                 portal.enterPortal(c);
             } else if (player.getHp() <= 0) {
                 int returnMap = player.getMap().getReturnMap();
@@ -807,7 +762,7 @@ public class UserHandler {
         }
     }
 
-    public static void handleUserEnterPortalSpecialRequest(InPacket in, MapleClient c) {
+    public static void handleUserPortalScriptRequest(InPacket in, MapleClient c) {
         byte type = in.readByte();
         String portalName = in.readMapleAsciiString();
         Portal portal = c.getPlayer().getMap().getPortal(portalName);
@@ -835,8 +790,8 @@ public class UserHandler {
         byte mode = in.readByte();
         int fameChange = mode == 0 ? -1 : 1;
         other.addStatAndSendPacket(Stat.FAME, fameChange);
-        player.announce(UserPacket.addFameResponse(other, mode, other.getFame()));
-        other.announce(UserPacket.receiveFame(mode, player.getName()));
+        player.announce(UserPacket.fameResponse(FameResult.addFame(other.getName(), mode, other.getFame())));
+        other.announce(UserPacket.fameResponse(FameResult.receiveFame(player.getName(), mode)));
     }
 
     //角色表情
@@ -952,7 +907,7 @@ public class UserHandler {
         Locker locker = account.getLocker();
         byte type = in.readByte();
         CashItemType cit = CashItemType.getRequestTypeByVal(type);
-        CashShopServer cashShop = Server.getInstance().getCashShop(player.getWorld());
+        CashShopServer cashShop = Server.getInstance().getCashShop(player.getWorldId());
         if (cit == null) {
             log.error("Unhandled cash shop cash item request " + type);
             player.enableAction();
@@ -1190,9 +1145,7 @@ public class UserHandler {
         if (values == null) {
             return;
         }
-        if (chooseBefore) {
-            player.removeQuestEx(QuestConstants.QUEST_EX_MEMORIAL_CUBE);
-        } else {
+        if (!chooseBefore) {
             int ePos = Integer.parseInt(values.getOrDefault("dst", "-1"));
             int pot0 = Integer.parseInt(values.getOrDefault("pot0", "-1"));
             int pot1 = Integer.parseInt(values.getOrDefault("pot1", "-1"));
@@ -1208,6 +1161,7 @@ public class UserHandler {
             equip.setOption(1, pot1 == -1 ? 0 : pot1, add);
             equip.setOption(2, pot2 == -1 ? 0 : pot2, add);
             equip.updateToChar(player);
+            player.removeQuestEx(QuestConstants.QUEST_EX_MEMORIAL_CUBE);
         }
         player.announce(UserPacket.memorialCubeModified());
     }
@@ -1274,7 +1228,7 @@ public class UserHandler {
         Skill skill = chr.getSkill(skillId);
         int slv = skill == null ? 0 : skill.getCurrentLevel();
         if (slv == 0) {
-            return;
+            chr.chatMessage(ChatType.GameDesc, "无法使用技能");
         } else {
             boolean success = true;
             if (SkillData.getSkillInfo(skillId).hasCooltime()) {
@@ -1296,5 +1250,297 @@ public class UserHandler {
         MapleCharacter chr = c.getPlayer();
         TemporaryStatManager tsm = chr.getTemporaryStatManager();
         tsm.removeStatsBySkill(itemId);
+    }
+
+    //todo
+    public static void handleUserSkillPrepareRequest(InPacket in, MapleClient c) {
+        //7C 9F 2F 00 1E 00 00 00 87 6F 2E A3 00 16 80 04 00 01 8A 3D 0D
+        //7C 9F 2F 00 1E 00 00 00 87 6F 2E A3 00 16 00 04 00 7D 69 3C 0D
+        MapleCharacter player = c.getPlayer();
+        int skillId = in.readInt();
+        int slv = in.readInt();
+        in.readByte();
+        in.readInt();
+        in.readByte();//attackAction
+        in.readByte();//direction
+        in.readShort();
+        player.setTick(in.readInt());
+        if (!player.hasSkill(skillId)) {
+            return;
+        }
+        if (SkillConstants.isKeyDownMovingSkill(skillId)) {
+            SkillInfo si = SkillData.getSkillInfo(skillId);
+            Option option = new Option();
+            option.nOption = si.getValue(SkillStat.x, slv);
+            option.rOption = skillId;
+            TemporaryStatManager tsm = player.getTemporaryStatManager();
+            tsm.putCharacterStatValue(KeyDownMoving, option);
+            tsm.sendSetStatPacket();
+        }
+        player.setPrepareSkill(skillId, skillId);
+    }
+
+    //移动技能 包括五转钩锁或者法师的瞬移？
+    public static void handleUserEffectLocal(InPacket in, MapleClient c) {
+        int skillId = in.readInt();
+        short slv = in.readShort();
+        Position from = in.readPositionInt();
+        Position to = in.readPositionInt();
+    }
+
+    //有啥用呢
+    public static void handleUserB2BodyRequest(InPacket in, MapleClient c) {
+        short type = in.readShort();
+        int ownerCID = in.readInt();
+        int bodyIdCounter = in.readInt();
+        Position pos1 = in.readPosition();
+        Position pos2 = in.readPosition();
+        int skillID = in.readInt();
+        boolean isLeft = in.readByte() != 0;
+        in.skip(10);
+        in.readInt();
+        in.readByte();
+        in.readShort();
+        in.readShort();
+        in.readShort();
+        Position forcedPos = in.readPositionInt();
+        c.announce(UserPacket.userB2Body(type, bodyIdCounter));
+    }
+
+    public static void handleCheckProcess(InPacket in, MapleClient c) {
+        int sum = in.readShort();
+        for (int i = 0; i < sum; i++) {
+            String process = in.readMapleAsciiString();
+            int i1 = in.readInt();
+            String hash = in.readMapleAsciiString();
+        }
+    }
+
+    public static void handleUserSetGameResolution(InPacket in, MapleClient c) {
+        byte resolution = in.readByte();
+        boolean windowed = in.readByte() == 0;
+    }
+
+    public static void handleGoldHammerComplete(InPacket in, MapleClient c) {
+        int i1 = in.readInt();
+        int i2 = in.readInt();
+
+
+        c.write(UserPacket.goldHammerItemUpgradeResult((byte) 2, i1));
+    }
+
+
+    public static void handleStackChairs(InPacket in, MapleClient c) {
+        int unk = in.readInt();
+        //7266
+        HashMap<String, String> questEx = new HashMap<>();
+        for (int i = 0; i < 6; i++) {
+            int chairId = in.readInt();
+            questEx.put(String.valueOf(i), String.valueOf(chairId));
+        }
+        MapleCharacter chr = c.getPlayer();
+        chr.addQuestExAndSendPacket(QUEST_EX_STACK_CHAIRS, questEx);
+    }
+
+    public static void handleReactorClick(InPacket in, MapleClient c) {
+        MapleCharacter chr = c.getPlayer();
+        int objID = in.readInt();
+        int idk = in.readInt();
+        byte type = in.readByte();
+        MapleMapObj life = chr.getMap().getObj(objID);
+        if (!(life instanceof Reactor)) {
+            log.error("Could not find reactor with objID " + objID);
+            return;
+        }
+        Reactor reactor = (Reactor) life;
+        int templateID = reactor.getTemplateId();
+//        ReactorInfo ri = ReactorData.getReactorInfoByID(templateID);
+//        String action = ri.getAction();
+//        if (chr.getScriptManager().isActive(ScriptType.Reactor)
+//                && chr.getScriptManager().getParentIDByScriptType(ScriptType.Reactor) == templateID) {
+//            try {
+//                chr.getScriptManager().getInvocableByType(ScriptType.Reactor).invokeFunction("action", reactor, type);
+//            } catch (ScriptException | NoSuchMethodException e) {
+//                e.printStackTrace();
+//            }
+//        } else {
+//            chr.getScriptManager().startScript(templateID, objID, action, ScriptType.Reactor);
+//        }
+
+    }
+
+    public static void handleUserMiracleCirculatorSelect(InPacket in, MapleClient c) {
+        MapleCharacter chr = c.getPlayer();
+        chr.setTick(in.readInt());
+        boolean chooseAfter = in.readByte() != 0;
+        if (chooseAfter) {
+            CharacterPotentialMan potentialMan = chr.getPotentialMan();
+            Set<CharacterPotential> temp = potentialMan.getTemp();
+            int i = 0;
+            for (CharacterPotential characterPotential : temp) {
+                i++;
+                potentialMan.addPotential(characterPotential, i == temp.size());
+            }
+        } else {
+            in.readByte();
+        }
+    }
+
+    public static void handleMatrixRequest(InPacket in, MapleClient c) {
+        MapleCharacter chr = c.getPlayer();
+        int type = in.readInt();
+        MatrixUpdateType updateType = MatrixUpdateType.getUpdateTypeByVal(type);
+        if (updateType == null) {
+            chr.chatMessage(String.format("[VMatrix Update] Packet Data %s", in));
+            chr.chatMessage(String.format("[VMatrix Update] Unknown update type [%d]", type));
+            return;
+        }
+
+        switch (updateType) {
+            case ENABLE: {
+                int slot = in.readInt();
+                in.readInt();// -1
+                in.readInt();// -1
+                int toSlot = in.readInt();
+                boolean replace = in.readByte() != 0;
+                chr.write(UserPacket.updateVMatrix(chr, true, MatrixUpdateType.ENABLE, chr.getMatrixInventory().activateSkill(slot, toSlot)));
+                MatrixInventory.reloadSkills(chr);
+                break;
+            }
+            case DISABLE: {
+                int slot = in.readInt();
+                in.readInt();// -1
+                chr.write(UserPacket.updateVMatrix(chr, true, MatrixUpdateType.DISABLE, chr.getMatrixInventory().deactivateSkill(slot)));
+                MatrixInventory.reloadSkills(chr);
+                break;
+            }
+            case MOVE: {
+                int skillSlotID = in.readInt();
+                int replaceSkill = in.readInt();
+                int fromSlot = in.readInt();// 0
+                int toSlot = in.readInt();
+                chr.getMatrixInventory().moveSkill(skillSlotID, replaceSkill, fromSlot, toSlot);
+                chr.write(UserPacket.updateVMatrix(chr, true, MatrixUpdateType.MOVE, 0));
+                MatrixInventory.reloadSkills(chr);
+                break;
+            }
+            case DISASSEMBLE_SINGLE: {
+                int slot = in.readInt();
+                in.readInt();// -1
+                chr.getMatrixInventory().disassemble(chr, slot);
+                MatrixInventory.reloadSkills(chr);
+                break;
+            }
+            case DISASSEMBLE_MULTIPLE: {
+                int count = in.readInt();
+
+                List<MatrixSkill> skills = new ArrayList<>();
+                for (int i = 0; i < count; i++) {
+                    MatrixSkill skill = chr.getMatrixInventory().getSkill(in.readInt());
+                    if (skill != null) {
+                        skills.add(skill);
+                    }
+                }
+                chr.getMatrixInventory().disassembleMultiple(chr, skills);
+                MatrixInventory.reloadSkills(chr);
+                break;
+            }
+            case ENHANCE: {
+                int slot = in.readInt();
+                MatrixSkill toEnhance = chr.getMatrixInventory().getSkill(slot);
+                if (toEnhance != null && toEnhance.getLevel() < VCoreData.getMaxLevel(VCoreData.getCore(toEnhance.getCoreId()).getType())) {
+                    int count = in.readInt();
+                    List<MatrixSkill> skills = new ArrayList<>();
+                    for (int i = 0; i < count; i++) {
+                        MatrixSkill skill = chr.getMatrixInventory().getSkill(in.readInt());
+                        if (skill != null) {
+                            skills.add(skill);
+                        }
+                    }
+                    chr.getMatrixInventory().enhance(chr, toEnhance, skills);
+                    MatrixInventory.reloadSkills(chr);
+                }
+                break;
+            }
+            case CRAFT_NODE: {
+                int coreID = in.readInt();
+                VCore core = VCoreData.getCore(coreID);
+                int quantity = in.readInt();
+                if (core != null) {
+                    int price = 0;
+                    if (VCoreData.isSkillNode(coreID)) {
+                        price = MatrixConstants.CRAFT_SKILL_CORE_COST;
+                    } else if (VCoreData.isBoostNode(coreID)) {
+                        price = MatrixConstants.CRAFT_ENCHANT_CORE_COST;
+                    } else if (VCoreData.isSpecialNode(coreID)) {
+                        price = MatrixConstants.CRAFT_SPECIAL_CORE_COST;
+                    } else if (VCoreData.isExpNode(coreID)) {
+                        price = MatrixConstants.CRAFT_GEMSTONE_COST;
+                    }
+                    price *= quantity;
+                    if (price > 0) {
+                        int shardCount = chr.getShards();
+                        if (shardCount >= price) {
+                            chr.incShards(-price);
+
+                            MatrixSkill skill = new MatrixSkill();
+                            skill.setCoreId(coreID);
+                            if (!VCoreData.isSpecialNode(coreID)) {
+                                skill.setSkill1(core.getConnectSkills().get(0));
+                                skill.setLevel(1);
+                                skill.setMasterLevel(core.getMaxLevel());
+                            } else {
+                                skill.setSkill1(0);
+                                skill.setLevel(1);
+                                skill.setMasterLevel(1);
+                                skill.setExpirationDate(DateUtil.getFileTime(System.currentTimeMillis() + (86400000L * core.getExpireAfter())));
+                            }
+                            if (VCoreData.isBoostNode(coreID)) {
+                                List<VCore> boostNode = VCoreData.getBoostNodes();
+                                boostNode.remove(core);
+
+                                core = boostNode.get((int) (Math.random() % boostNode.size()));
+                                while (!core.isJobSkill(chr.getJob())) {
+                                    core = boostNode.get((int) (Math.random() % boostNode.size()));
+                                }
+                                boostNode.remove(core);
+                                skill.setSkill2(core.getConnectSkills().get(0));
+
+                                core = boostNode.get((int) (Math.random() % boostNode.size()));
+                                while (!core.isJobSkill(chr.getJob())) {
+                                    core = boostNode.get((int) (Math.random() % boostNode.size()));
+                                }
+                                skill.setSkill3(core.getConnectSkills().get(0));
+                            }
+                            chr.getMatrixInventory().addSkill(skill);
+                            MatrixInventory.reloadSkills(chr);
+                            chr.write(UserPacket.updateVMatrix(chr, false, MatrixUpdateType.CRAFT_NODE, 0));
+                            chr.write(UserPacket.nodeCraftResult(coreID, quantity, skill.getSkill1(), skill.getSkill2(), skill.getSkill3()));
+                        }
+                    }
+                }
+                break;
+            }
+            case SLOT_ENHANCEMENT: {
+                int slotId = in.readInt();
+                in.readInt();//FF FF FF FF
+                MatrixInventory matrixInventory = chr.getMatrixInventory();
+                MatrixSlot matrixSlot = matrixInventory.getMatrixSlotBySlotId(slotId);
+                if (matrixSlot.getEnhanceLevel() >= 5) {
+                    return;
+                }
+                matrixSlot.setEnhanceLevel(matrixSlot.getEnhanceLevel() + 1);
+                MatrixInventory.reloadSkills(chr);
+                chr.announce(UserPacket.updateVMatrix(chr, false, MatrixUpdateType.SLOT_ENHANCEMENT, 0));
+            }
+            case RESET_SLOT_ENHANCEMENT: {
+                chr.getMatrixInventory().resetSlotsEnhanceLevel(chr);
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+
     }
 }

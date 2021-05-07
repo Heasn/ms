@@ -2,6 +2,7 @@ package im.cave.ms.connection.packet;
 
 import im.cave.ms.client.character.skill.BurnedInfo;
 import im.cave.ms.client.field.movement.MovementInfo;
+import im.cave.ms.client.field.obj.mob.EscortDest;
 import im.cave.ms.client.field.obj.mob.ForcedMobStat;
 import im.cave.ms.client.field.obj.mob.Mob;
 import im.cave.ms.client.field.obj.mob.MobSkillAttackInfo;
@@ -66,11 +67,26 @@ public class MobPacket {
         return out;
     }
 
+    public static OutPacket damaged(int mobId, long damage, int templateId, byte type, long hp, long maxHp) {
+        OutPacket out = new OutPacket(SendOpcode.MOB_DAMAGED);
+
+        out.writeInt(mobId);
+        out.write(type);
+        out.writeLong(damage);
+        out.writeLong(hp);
+        out.writeLong(maxHp);
+
+        return out;
+    }
+
+
     public static OutPacket hpIndicator(int objectId, byte percentage) {
         OutPacket out = new OutPacket(SendOpcode.HP_INDICATOR);
+
         out.writeInt(objectId);
         out.writeInt(percentage);
         out.write(0);
+
         return out;
     }
 
@@ -93,8 +109,10 @@ public class MobPacket {
 
     public static OutPacket removeMob(int objectId, RemoveMobType type) {
         OutPacket out = new OutPacket(SendOpcode.REMOVE_MOB);
+
         out.writeInt(objectId);
         out.write(type.getVal());
+
         out.writeZeroBytes(8);
         return out;
     }
@@ -105,7 +123,7 @@ public class MobPacket {
         out.writeBool(isController);
         out.writeInt(mob.getObjectId());
         if (isController) {
-            out.write(mob.getCalcDamageIndex());
+            out.write(mob.getCalcDamageIndex()); //可能不是这个意思 Controller包是1 Spawn是0
             out.writeInt(mob.getTemplateId());
             ForcedMobStat forcedMobStat = mob.getForcedMobStat();
             out.writeBool(forcedMobStat != null);
@@ -133,6 +151,7 @@ public class MobPacket {
         out.write(msai.action);
         out.writeLong(msai.targetInfo);
         out.writeZeroBytes(6);
+        out.writeInt(0);
         out.write(msai.multiTargetForBalls.size());
         for (Position pos : msai.multiTargetForBalls) {
             out.writePosition(pos);
@@ -192,6 +211,36 @@ public class MobPacket {
             out.writeBool(sn);
         }
         resetStats.getRemovedStatVals().clear();
+        return out;
+    }
+
+
+    public static OutPacket escortFullPath(Mob mob, int oldAttr, boolean stopEscort) {
+        OutPacket out = new OutPacket(SendOpcode.ESCORT_FULL_PATH);
+
+        out.writeInt(mob.getObjectId());
+        out.writeInt(mob.getEscortDest().size());
+        out.writeShort(mob.getPosition().getX());
+        out.writeShort(oldAttr);
+        out.writeInt(mob.getPosition().getY());
+
+        for (EscortDest escortDest : mob.getEscortDest()) {
+            out.writeShort(escortDest.getDestPos().getX());
+            out.writeShort(escortDest.getAttr());
+            out.writeInt(escortDest.getDestPos().getY());
+            out.writeInt(escortDest.getMass());
+            if (escortDest.getMass() == 2) {
+                out.writeInt(escortDest.getStopDuration());
+            }
+        }
+        out.writeInt(mob.getCurrentDestIndex());
+        int stopDuration = mob.getEscortStopDuration();
+        out.writeBool(stopDuration > 0);
+        if (stopDuration > 0) {
+            out.writeInt(stopDuration);
+        }
+        out.writeBool(stopEscort);
+
         return out;
     }
 }

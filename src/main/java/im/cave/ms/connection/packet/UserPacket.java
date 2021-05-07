@@ -1,7 +1,6 @@
 package im.cave.ms.connection.packet;
 
 import im.cave.ms.client.MapleClient;
-import im.cave.ms.client.Record;
 import im.cave.ms.client.character.Macro;
 import im.cave.ms.client.character.MapleCharacter;
 import im.cave.ms.client.character.Stat;
@@ -13,31 +12,23 @@ import im.cave.ms.client.character.potential.CharacterPotential;
 import im.cave.ms.client.character.skill.Skill;
 import im.cave.ms.client.character.temp.TemporaryStatManager;
 import im.cave.ms.client.field.Effect;
+import im.cave.ms.client.field.Portal;
 import im.cave.ms.client.field.movement.MovementInfo;
 import im.cave.ms.connection.crypto.TripleDESCipher;
 import im.cave.ms.connection.netty.OutPacket;
+import im.cave.ms.connection.netty.Packet;
 import im.cave.ms.connection.packet.opcode.RecvOpcode;
 import im.cave.ms.connection.packet.opcode.SendOpcode;
-import im.cave.ms.enums.EnchantStat;
-import im.cave.ms.enums.MessageType;
-import im.cave.ms.enums.CharMask;
-import im.cave.ms.enums.DamageSkinType;
-import im.cave.ms.enums.EquipmentEnchantType;
-import im.cave.ms.enums.InventoryOperationType;
-import im.cave.ms.enums.InventoryType;
-import im.cave.ms.enums.RecordType;
+import im.cave.ms.connection.packet.result.FameResult;
+import im.cave.ms.connection.packet.result.InGameDirectionEvent;
+import im.cave.ms.enums.*;
 import im.cave.ms.tools.DateUtil;
+import im.cave.ms.tools.Position;
 import im.cave.ms.tools.Randomizer;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 
-import static im.cave.ms.constants.ServerConstants.DESKEY;
+import static im.cave.ms.constants.ServerConstants.DES_KEY;
 import static im.cave.ms.constants.ServerConstants.MAX_TIME;
 import static im.cave.ms.enums.InventoryType.EQUIPPED;
 
@@ -51,16 +42,15 @@ public class UserPacket {
     public static final Map<Stat, Long> EMPTY_STATUS = Collections.emptyMap();
 
     public static OutPacket enableActions() {
-        return updatePlayerStats(EMPTY_STATUS, true, null);
+        return statChanged(EMPTY_STATUS, true, null);
     }
 
-    public static OutPacket updatePlayerStats(Map<Stat, Long> stats, MapleCharacter chr) {
-        return updatePlayerStats(stats, false, chr);
+    public static OutPacket statChanged(Map<Stat, Long> stats, MapleCharacter chr) {
+        return statChanged(stats, false, chr);
     }
 
-    public static OutPacket updatePlayerStats(Map<Stat, Long> stats, boolean enableActions, MapleCharacter chr) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.UPDATE_STATS.getValue());
+    public static OutPacket statChanged(Map<Stat, Long> stats, boolean enableActions, MapleCharacter chr) {
+        OutPacket out = new OutPacket(SendOpcode.STAT_CHANGED);
         out.write(enableActions ? 1 : 0);
         out.write(0); //unk
         long mask = 0;
@@ -121,7 +111,7 @@ public class UserPacket {
         out.write(chr != null ? chr.getCharLook().getHairColorProb() : 0);
         out.write(0);
         out.write(0);
-
+        out.write(0);
         return out;
 
     }
@@ -140,43 +130,50 @@ public class UserPacket {
     }
 
     public static OutPacket move(MapleCharacter player, MovementInfo movementInfo) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.REMOTE_MOVE.getValue());
+        OutPacket out = new OutPacket(SendOpcode.REMOTE_MOVE);
+
         out.writeInt(player.getId());
         movementInfo.encode(out);
+
         return out;
     }
 
-    public static OutPacket setInGameDirectionMode(boolean enable) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.SET_STAND_ALONE_MODE.getValue());
+    public static OutPacket setStandAloneMode(boolean enable) {
+        OutPacket out = new OutPacket(SendOpcode.SET_STAND_ALONE_MODE);
+
         out.writeBool(enable);
+
         return out;
     }
 
-    public static OutPacket disableUI(boolean disable) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.SET_IN_GAME_DIRECTION_MODE.getValue());
-        out.writeBool(disable);
-        out.writeBool(disable);
-        if (disable) {
-            out.writeBool(false);
-            out.writeBool(false);
+    public static OutPacket setInGameDirectionMode(boolean lockUI, boolean blackFrame, boolean forceMouseOver, boolean showUI) {
+        OutPacket out = new OutPacket(SendOpcode.SET_IN_GAME_DIRECTION_MODE);
+
+        out.writeBool(lockUI);
+        out.writeBool(blackFrame);
+        if (lockUI) {
+            out.writeBool(forceMouseOver);
+            out.writeBool(showUI);
         }
+
         return out;
     }
 
     public static OutPacket updateMaplePoint(MapleCharacter chr) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.UPDATE_MAPLE_POINT.getValue());
+        OutPacket out = new OutPacket(SendOpcode.UPDATE_MAPLE_POINT);
+
         out.writeInt(chr.getId());
         out.writeInt(chr.getAccount().getPoint());
+
         return out;
     }
 
+    /*
+        角色乘坐地图固定椅子或者起身离开移动椅子时
+     */
     public static OutPacket sitResult(int charId, short id) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.SIT_RESULT.getValue());
+        OutPacket out = new OutPacket(SendOpcode.SIT_RESULT);
+
         out.writeInt(charId);
         if (id != -1) {
             out.write(1);
@@ -184,13 +181,15 @@ public class UserPacket {
         } else {
             out.write(0);
         }
+
         return out;
     }
 
     public static OutPacket userSit() {
-        OutPacket out = new OutPacket();
-        out.writeInt(SendOpcode.USER_SIT.getValue());
+        OutPacket out = new OutPacket(SendOpcode.USER_SIT);
+
         out.writeInt(0);
+
         return out;
     }
 
@@ -228,7 +227,7 @@ public class UserPacket {
 
     public static OutPacket changeSkillRecordResult(List<Skill> skills, boolean exclRequestSent, boolean showResult
             , boolean removeLinkSkill, boolean sn) {
-        OutPacket out = new OutPacket(SendOpcode.CHANGE_SKILL_RESULT);
+        OutPacket out = new OutPacket(SendOpcode.CHANGE_SKILL_RECORD_RESULT);
 
         out.writeBool(exclRequestSent);
         out.writeBool(showResult);
@@ -245,27 +244,45 @@ public class UserPacket {
         return out;
     }
 
-    public static OutPacket skillCoolTimeSet(int skillId, int cdMS) {
+    public static OutPacket setSkillCoolTime(int skillId, int cdMS) {
         Map<Integer, Integer> cds = new HashMap<>();
         cds.put(skillId, cdMS);
-        return skillCoolTimeSet(cds);
+        return setSkillCoolTime(cds);
     }
 
-    public static OutPacket skillCoolTimeSet(Map<Integer, Integer> cooltimes) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.SKILL_COOLTIME_SET.getValue());
+    public static OutPacket setSkillCoolTime(MapleCharacter chr) {
+        Map<Integer, Long> skillCooltimes = chr.getSkillCooltimes();
+
+        if (skillCooltimes == null || skillCooltimes.size() == 0) {
+            return null;
+        }
+
+        long now = System.currentTimeMillis();
+        HashMap<Integer, Integer> cds = new HashMap<>();
+
+        skillCooltimes.forEach((skillId, time) ->
+                cds.put(skillId, Math.min((int) (time - now), 0))
+        );
+
+        return setSkillCoolTime(cds);
+    }
+
+    public static OutPacket setSkillCoolTime(Map<Integer, Integer> cooltimes) {
+        OutPacket out = new OutPacket(SendOpcode.SKILL_COOLTIME_SET);
+
         out.writeInt(cooltimes.size());
         cooltimes.forEach((id, cooltime) -> {
             out.writeInt(id);
             out.writeInt(cooltime);
         });
+
         return out;
     }
 
     public static OutPacket skillCoolDown(int skillId) {
         HashMap<Integer, Integer> skills = new HashMap<>();
         skills.put(skillId, 0);
-        return skillCoolTimeSet(skills);
+        return setSkillCoolTime(skills);
     }
 
     public static OutPacket removeBuff(TemporaryStatManager tsm, boolean demount) {
@@ -295,6 +312,35 @@ public class UserPacket {
     public static OutPacket effect(Effect effect) {
         OutPacket out = new OutPacket(SendOpcode.EFFECT);
         effect.encode(out);
+        return out;
+    }
+
+    public static OutPacket teleport(int type, Position position, Portal portal) {
+        OutPacket out = new OutPacket(SendOpcode.TELEPORT);
+        out.writeBool(false);// excl request
+        out.write(type);
+        /*
+        TODO: import the enum
+        enum USER_TELEPORT_CALLING_TYPE
+        {
+          TELEPORT_CALLING_TYPE_DEFAULT = 0x0,
+          TELEPORT_CALLING_TYPE_GUILD = 0x1,
+          TELEPORT_CALLING_TYPE_FLAMEWIZARD_FLAREBLINK = 0x2,
+          TELEPORT_CALLING_TYPE_BYSCRIPT = 0x3,
+        };
+         */
+        switch (type) {
+            case 0x00:
+                out.writeInt(portal.getId());
+                out.write(0);
+                break;
+            case 0xCD:
+                out.writeInt(1);//charId
+                out.writePosition(position);
+                break;
+
+        }
+
         return out;
     }
 
@@ -376,12 +422,13 @@ public class UserPacket {
     }
 
     public static OutPacket scrollUpgradeDisplay(boolean feverTime, List<ScrollUpgradeInfo> scrolls) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.EQUIPMENT_ENCHANT.getValue());
+        OutPacket out = new OutPacket(SendOpcode.EQUIPMENT_ENCHANT);
+
         out.write(EquipmentEnchantType.ScrollUpgradeDisplay.getVal());
         out.writeBool(feverTime);
         out.write(scrolls.size());
         scrolls.forEach(scrollUpgradeInfo -> scrollUpgradeInfo.encode(out));
+
         return out;
     }
 
@@ -399,10 +446,12 @@ public class UserPacket {
 
     public static OutPacket macroSysDataInit(MapleCharacter chr) {
         OutPacket out = new OutPacket(SendOpcode.MACRO_SYS_DATA_INIT);
+
         out.write(chr.getMacros().size());
         for (Macro macro : chr.getMacros()) {
             macro.encode(out);
         }
+
         return out;
     }
 
@@ -410,10 +459,13 @@ public class UserPacket {
         return characterPotentialSet(true, true, cp.getKey(), cp.getSkillID(), cp.getSlv(), cp.getGrade(), true);
     }
 
+    public static OutPacket characterPotentialSet(CharacterPotential cp, boolean updatePassive) {
+        return characterPotentialSet(true, true, cp.getKey(), cp.getSkillID(), cp.getSlv(), cp.getGrade(), updatePassive);
+    }
+
     public static OutPacket characterPotentialSet(boolean exclRequest, boolean changed, short pos, int skillID,
                                                   short skillLevel, short grade, boolean updatePassive) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.CHARACTER_POTENTIAL_SET.getValue());
+        OutPacket out = new OutPacket(SendOpcode.CHARACTER_POTENTIAL_SET);
         out.writeBool(exclRequest);
         out.writeBool(changed);
         if (changed) {
@@ -421,7 +473,7 @@ public class UserPacket {
             out.writeInt(skillID);
             out.writeShort(skillLevel);
             out.writeShort(grade);
-            out.writeBool(updatePassive);
+            out.writeBool(updatePassive); //全部重置的话第三条就是true
         }
         return out;
     }
@@ -450,6 +502,17 @@ public class UserPacket {
         return out;
     }
 
+
+    public static OutPacket resurrectionCountdown(int time1, int time2, boolean opt) {
+        OutPacket out = new OutPacket(SendOpcode.RESURRECTION_COUNTDOWN);
+
+        out.writeInt(time1);  //20s
+        out.writeInt(time2);  //20s
+        out.writeBool(opt);   //false
+
+        return out;
+    }
+
     public static OutPacket updateHonerPoint(int honerPoint) {
         OutPacket out = new OutPacket();
         out.writeShort(SendOpcode.CHARACTER_HONOR_POINT.getValue());
@@ -468,20 +531,29 @@ public class UserPacket {
     public static OutPacket quickslotInit(MapleCharacter player) {
         OutPacket out = new OutPacket();
         out.writeShort(SendOpcode.QUICKSLOT_INIT.getValue());
-        boolean edited = player.getQuickslots() != null && player.getQuickslots().size() == 32;
+        boolean edited = player.getQuickSlots() != null && player.getQuickSlots().size() == 32;
         out.writeBool(edited);
-        if (player.getQuickslots() != null) {
-            for (Integer key : player.getQuickslots()) {
+        if (player.getQuickSlots() != null) {
+            for (Integer key : player.getQuickSlots()) {
                 out.writeInt(key);
             }
         }
         return out;
     }
 
+    public static OutPacket progress(int progress) {
+        OutPacket out = new OutPacket(SendOpcode.PROGRESS);
+
+        out.writeInt(progress);
+
+        return out;
+    }
+
     public static OutPacket openWorldMap() {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.OPEN_WORLDMAP.getValue());
+        OutPacket out = new OutPacket(SendOpcode.OPEN_WORLDMAP);
+
         out.writeInt(0);
+
         return out;
     }
 
@@ -505,7 +577,7 @@ public class UserPacket {
         }
         used.clear();
 
-        TripleDESCipher tripleDESCipher = new TripleDESCipher(DESKEY);
+        TripleDESCipher tripleDESCipher = new TripleDESCipher(DES_KEY);
         try {
             byte[] buffer = new byte[Short.MAX_VALUE + 1];
             byte[] encrypt = tripleDESCipher.Encrypt(sOpcodes.toString().getBytes());
@@ -532,23 +604,24 @@ public class UserPacket {
         return out;
     }
 
-    public static OutPacket addFameResponse(MapleCharacter other, int mode, int newFame) {
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.FAME_RESPONSE.getValue());
-        out.write(0);
-        out.writeMapleAsciiString(other.getName());
-        out.write(mode);
-        out.writeInt(newFame);
-        return out;
-    }
+    public static OutPacket fameResponse(FameResult fameResult) {
+        OutPacket out = new OutPacket(SendOpcode.FAME_RESPONSE);
 
-    public static OutPacket receiveFame(int mode, String charName) {
+        out.write(fameResult.getAction().getVal());
+        switch (fameResult.getAction()) {
+            case Add:
+                out.writeMapleAsciiString(fameResult.getStr());
+                out.write(fameResult.getArg1());
+                out.writeInt(fameResult.getArg2());
+                break;
+            case Receive:
+                out.writeMapleAsciiString(fameResult.getStr());
+                out.write(fameResult.getArg1());
+                break;
+            case AlreadyAddInThisMonth:
+                break;
+        }
 
-        OutPacket out = new OutPacket();
-        out.writeShort(SendOpcode.FAME_RESPONSE.getValue());
-        out.write(5);
-        out.writeMapleAsciiString(charName);
-        out.write(mode);
         return out;
     }
 
@@ -698,15 +771,6 @@ public class UserPacket {
         return out;
     }
 
-    public static OutPacket remainingMapTransferCoupon(MapleCharacter chr) {
-        OutPacket out = new OutPacket(SendOpcode.REMAINING_MAP_TRANSFER_COUPON);
-        Record cash = chr.getRecordManager().getRecord(RecordType.MAP_TRANSFER_COUPON_CASH);
-        Record free = chr.getRecordManager().getRecord(RecordType.MAP_TRANSFER_COUPON_FREE);
-        out.writeInt(free != null ? free.getValue() : 0);
-        out.writeInt(cash != null ? cash.getValue() : 0);
-        return out;
-    }
-
     public static OutPacket hyperUpgradeDisplay(Equip equip, boolean downgradable, long stars, int successChance, int destroyChance,
                                                 boolean chanceTime) {
 
@@ -778,6 +842,21 @@ public class UserPacket {
 
     public static OutPacket memorialCubeResult(Item item, Equip equip) {
         OutPacket out = new OutPacket(SendOpcode.MEMORIAL_CUBE_RESULT);
+
+        out.writeLong(equip.getId());
+        out.writeBool(true); //equip!=null
+        equip.encode(out);
+        out.writeInt(item.getItemId());
+        out.writeInt(equip.getPos());
+        out.writeInt(item.getQuantity());
+        out.writeInt(item.getPos());
+
+        return out;
+    }
+
+    public static OutPacket blackCubeResult(Item item, Equip equip) {
+        OutPacket out = new OutPacket(SendOpcode.BLACK_CUBE_RESULT);
+
         out.writeLong(equip.getId());
         out.writeBool(true);
         equip.encode(out);
@@ -785,12 +864,203 @@ public class UserPacket {
         out.writeInt(equip.getPos());
         out.writeInt(item.getQuantity());
         out.writeInt(item.getPos());
+
         return out;
     }
 
+    public static Packet hexagonalCubeModifiedResult() {
+        OutPacket out = new OutPacket(SendOpcode.HEXAGONAL_CUBE_RESULT);
+
+        out.writeShort(1);
+        out.writeInt(0);
+
+        return out;
+    }
+
+    public static Packet reflectionCubeResult(Item item, Equip equip, MapleCharacter chr) {
+        OutPacket out = new OutPacket(SendOpcode.REFLECTION_CUBE_RESULT);
+
+        out.writeInt(chr.getId());
+        out.write(0);
+        out.writeInt(item.getItemId());
+        out.writeInt(equip.getPos());
+        equip.encode(out);
+
+        return out;
+    }
+
+    public static OutPacket hexagonalCubeResult(int level, List<Integer> options) {
+        OutPacket out = new OutPacket(SendOpcode.HEXAGONAL_CUBE_RESULT);
+
+        out.writeShort(0);
+        out.writeInt(0);
+
+        out.writeInt(level);
+        out.writeInt(options.size());
+        for (Integer option : options) {
+            out.writeInt(option);
+        }
+
+        return out;
+    }
+
+    public static OutPacket uniqueCubeResult(int line) {
+        OutPacket out = new OutPacket(SendOpcode.UNIQUE_CUBE_RESULT);
+
+        out.writeShort(0);
+        out.writeInt(0);
+        out.writeInt(line);
+
+        return out;
+    }
+
+    public static OutPacket uniqueCubeModifiedResult(int line) {
+        OutPacket out = new OutPacket(SendOpcode.UNIQUE_CUBE_RESULT);
+
+        out.writeShort(1);
+        out.writeInt(0);
+        out.writeInt(line);
+
+        return out;
+    }
+
+
     public static OutPacket memorialCubeModified() {
         OutPacket out = new OutPacket(SendOpcode.MEMORIAL_CUBE_MODIFIED);
+
         out.writeBool(false);
+
+        return out;
+    }
+
+    public static OutPacket miracleCirculatorResult(Set<CharacterPotential> potentials, Item item) {
+        OutPacket out = new OutPacket(SendOpcode.MIRACLE_CIRCULATOR_RESULT);
+
+        out.writeInt(potentials.size());
+        for (CharacterPotential potential : potentials) {
+            out.writeInt(potential.getSkillID());
+            out.write(potential.getSlv());
+            out.write(potential.getKey());
+            out.write(potential.getGrade());
+        }
+        out.writeInt(item.getItemId());
+
+        out.writeInt(0);
+        out.writeInt(0);
+        out.writeInt(0);
+        out.writeInt(0);
+        return out;
+    }
+
+    public static Packet userB2Body(short type, int bodyIdCounter) {
+        OutPacket out = new OutPacket(SendOpcode.USER_B2_BODY);
+
+        out.writeInt(type);
+        out.writeInt(bodyIdCounter);
+
+        return out;
+    }
+
+
+    public static OutPacket lifeCount(int count) {
+        OutPacket out = new OutPacket(SendOpcode.LIFE_COUNT);
+
+        out.writeInt(count);
+
+        return out;
+    }
+
+
+    public static OutPacket goldHammerItemUpgradeResult(byte returnResult, int msg) {
+        OutPacket out = new OutPacket(SendOpcode.GOLD_HAMMER_RESULT);
+
+        out.write(0);
+        out.write(returnResult);
+        out.writeInt(msg);
+        out.writeInt(0);
+        out.writeInt(0);
+
+        return out;
+    }
+
+
+    public static OutPacket modComboResponse(int combo) {
+        OutPacket out = new OutPacket(SendOpcode.MOD_COMBO_RESPONSE);
+
+        out.writeInt(combo);
+
+        return out;
+    }
+
+
+    public static OutPacket incJudgementStack(byte amount) {
+        OutPacket out = new OutPacket(SendOpcode.INC_JUDGEMENT_STACK_RESPONSE);
+
+        out.write(0);
+        out.write(amount);
+
+        return out;
+    }
+
+
+    public static OutPacket updateVMatrix(MapleCharacter chr, boolean update, MatrixUpdateType updateType, int pos) {
+        OutPacket out = new OutPacket(SendOpcode.UPDATE_MATRIX);
+        chr.getMatrixInventory().encode(out);
+        out.writeInt(update);
+        if (update) {
+            out.writeInt(updateType.getVal());
+            out.writeInt(pos);
+        }
+        return out;
+    }
+
+    public static OutPacket nodeCraftResult(int coreID, int quantity, int skillID1, int skillID2, int skillID3) {
+        OutPacket out = new OutPacket(SendOpcode.NODE_CRAFT_RESULT);
+
+        out.writeInt(coreID);
+        out.writeInt(1);
+        out.writeInt(skillID1);
+        out.writeInt(skillID2);
+        out.writeInt(skillID3);
+        out.writeInt(quantity); //size
+        return out;
+    }
+
+    public static OutPacket nodeEnhanceResult(int recordID, int exp, int slv1, int slv2) {
+        OutPacket out = new OutPacket(SendOpcode.NODE_ENHANCE_RESULT);
+
+        out.writeInt(recordID);
+        out.writeInt(exp);
+        out.writeInt(slv1);
+        out.writeInt(slv2);
+
+        return out;
+    }
+
+    public static OutPacket nodeShardResult(int shard) {
+        OutPacket out = new OutPacket(SendOpcode.NODE_SHARD_RESULT);
+
+        out.writeInt(shard);
+
+        return out;
+    }
+
+    public static OutPacket erdaSpectrumCounter(int erda, int arg1, int arg2) {
+        OutPacket out = new OutPacket(SendOpcode.ERDA_SPECTRUM);
+
+        out.writeInt(erda);
+        out.writeInt(arg1);
+        out.writeInt(arg2);
+
+        return out;
+    }
+
+
+    public static OutPacket inGameDirectionEvent(InGameDirectionEvent igdr) {
+        OutPacket out = new OutPacket(SendOpcode.IN_GAME_DIRECTION_EVENT);
+
+        igdr.encode(out);
+
         return out;
     }
 }

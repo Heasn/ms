@@ -10,6 +10,7 @@ import im.cave.ms.connection.server.world.World;
 import im.cave.ms.enums.LoginStatus;
 import im.cave.ms.enums.LoginType;
 import im.cave.ms.enums.ServerType;
+import im.cave.ms.scripting.map.MapScriptManager;
 import io.netty.channel.Channel;
 import io.netty.util.AttributeKey;
 import org.mindrot.jbcrypt.BCrypt;
@@ -164,10 +165,16 @@ public class MapleClient {
     }
 
     public void announce(Packet out) {
+        if (out == null) {
+            return;
+        }
         ch.writeAndFlush(out);
     }
 
     public void write(Packet out) {
+        if (out == null) {
+            return;
+        }
         ch.writeAndFlush(out);
     }
 
@@ -199,14 +206,14 @@ public class MapleClient {
     }
 
     public List<MapleCharacter> loadCharacters(int worldId) {
-        return this.getAccount().getCharacters().stream().filter(character -> character.getWorld() == worldId).collect(Collectors.toList());
+        return this.getAccount().getCharacters().stream().filter(character -> character.getWorldId() == worldId).collect(Collectors.toList());
     }
 
     public void sendPing() {
         announce(LoginPacket.ping(channelId == -1 ? ServerType.LOGIN : ServerType.CHANNEL));
     }
 
-    public MapleChannel getMapleChannel() {
+    public MapleChannel getChannel() {
         return Server.getInstance().getChannel(worldId, channelId);
     }
 
@@ -240,5 +247,6 @@ public class MapleClient {
 
     public void resetScripts() {
         engines.clear();
+        MapScriptManager.getInstance().reloadScripts();
     }
 }

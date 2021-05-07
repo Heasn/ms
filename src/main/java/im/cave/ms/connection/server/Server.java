@@ -11,26 +11,13 @@ import im.cave.ms.connection.server.channel.MapleChannel;
 import im.cave.ms.connection.server.login.LoginServer;
 import im.cave.ms.connection.server.service.EventManager;
 import im.cave.ms.connection.server.world.World;
-import im.cave.ms.provider.data.ItemData;
-import im.cave.ms.provider.data.MobData;
-import im.cave.ms.provider.data.NpcData;
-import im.cave.ms.provider.data.QuestData;
-import im.cave.ms.provider.data.StringData;
-import im.cave.ms.scripting.map.MapScriptManager;
-import im.cave.ms.scripting.npc.NpcScriptManager;
-import im.cave.ms.scripting.portal.PortalScriptManager;
-import im.cave.ms.scripting.quest.QuestScriptManager;
+import im.cave.ms.provider.data.*;
 import im.cave.ms.tools.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * @author fair
@@ -75,9 +62,18 @@ public class Server {
 
     public static void main(String[] args) {
         getInstance().init();
+        Runtime rt = Runtime.getRuntime();
+        if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+            try {
+                rt.exec("gsudo netsh int i add addr 1 221.231.130.70");
+            } catch (IOException ignored) {
+
+            }
+        }
     }
 
     private void initDataProvider() {
+        System.out.println("Begin DataProvider Init");
         StringData.init();
         MobData.init();
         ItemData.init();
@@ -182,6 +178,7 @@ public class Server {
                 return;
             }
         }
+        setOnline(true);
         //加载WZ
         EventManager.addEvent(this::initDataProvider, 0);
     }

@@ -72,6 +72,9 @@ public class Equip extends Item {
     private byte tradeAvailable = 0;
     private boolean showEffect = true;
     private long limitBreak;
+    private short arc;
+    private int arcExp;
+    private short arcLevel;
     @OneToOne(orphanRemoval = true, fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(name = "flame")
     private FlameStats flameStats;
@@ -200,15 +203,15 @@ public class Equip extends Item {
     public double getBaseStat(BaseStat baseStat) {
         // TODO: Sockets
         double res = 0;
-//        for (int i = 0; i < getOptions().size() - 1; i++) { // last one is anvil => skipped
-//            int id = getOptions().get(i);
-//            int level = (getRLevel() + getIIncReq()) / 10;
-//            ItemOption io = ItemData.getItemOptionById(id);
-//            if (io != null) {
-//                Map<BaseStat, Double> valMap = io.getStatValuesByLevel(level);
-//                res += valMap.getOrDefault(baseStat, 0D);
-//            }
-//        }
+        for (int i = 0; i < getOptions().size() - 1; i++) { // last one is anvil => skipped
+            int id = getOptions().get(i);
+            int level = (getRLevel() + getIIncReq()) / 10;
+            ItemOption io = ItemData.getItemOptionById(id);
+            if (io != null) {
+                Map<BaseStat, Double> valMap = io.getStatValuesByLevel(level);
+                res += valMap.getOrDefault(baseStat, 0D);
+            }
+        }
         switch (baseStat) {
             case str:
                 res += getTotalStat(EquipBaseStat.iStr);
@@ -950,12 +953,12 @@ public class Equip extends Item {
             out.writeLong(getFlame());
         }
         if (hasStat(EquipBaseStat.itemState)) {
-            out.writeInt(getItemState());
+            out.writeInt(getItemState()); //256 可能也是mask吧
         }
 
         out.writeMapleAsciiString(getOwner());
         out.write(getGrade());
-        out.write(getChuc());
+        out.write(getChuc()); //星之力
         for (int i = 0; i < 7; i++) {
             out.writeShort(getOptions().get(i));
         }
@@ -983,17 +986,18 @@ public class Equip extends Item {
             out.writeShort(0); //ARC LEVEL
         }
         out.writeShort(-1);
+
         out.writeLong(MAX_TIME);
         out.writeLong(ZERO_TIME);
         out.writeLong(MAX_TIME);
-        if (getAndroid() != null) {
-            Android android = getAndroid();
+        Android android = getAndroid();
+        if (android != null) {
             out.writeShort(android.getSkin());
             out.writeShort(android.getHair() + 10000);
             out.writeShort(android.getFace());
             out.writeMapleAsciiString(android.getName());
             out.writeInt(0);
-            out.writeLong(MAX_TIME);
+            out.writeLong(ZERO_TIME);
         }
         out.writeLong(getLimitBreak());
     }

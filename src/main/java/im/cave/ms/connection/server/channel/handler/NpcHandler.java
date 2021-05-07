@@ -12,19 +12,11 @@ import im.cave.ms.client.field.obj.npc.Npc;
 import im.cave.ms.client.field.obj.npc.shop.NpcShop;
 import im.cave.ms.client.field.obj.npc.shop.NpcShopItem;
 import im.cave.ms.connection.netty.InPacket;
-import im.cave.ms.connection.netty.OutPacket;
 import im.cave.ms.connection.packet.NpcPacket;
 import im.cave.ms.connection.packet.UserPacket;
 import im.cave.ms.connection.packet.WorldPacket;
-import im.cave.ms.connection.packet.opcode.SendOpcode;
-import im.cave.ms.connection.server.service.EventManager;
 import im.cave.ms.constants.ItemConstants;
-import im.cave.ms.enums.ChatType;
-import im.cave.ms.enums.InventoryOperationType;
-import im.cave.ms.enums.InventoryType;
-import im.cave.ms.enums.NpcMessageType;
-import im.cave.ms.enums.ShopRequestType;
-import im.cave.ms.enums.ShopResultType;
+import im.cave.ms.enums.*;
 import im.cave.ms.provider.data.ItemData;
 import im.cave.ms.provider.data.NpcData;
 import im.cave.ms.provider.info.ItemInfo;
@@ -44,7 +36,7 @@ import static im.cave.ms.enums.InventoryOperationType.ADD;
 /**
  * @author fair
  * @version V1.0
- * @Package im.cave.ms.net.handler.channel
+ * @Package im.cave.ms.net.handler.channelId
  * @date 11/30 19:10
  */
 public class NpcHandler {
@@ -93,9 +85,7 @@ public class NpcHandler {
                 script = String.valueOf(npcId);
             }
         }
-        String finalScript = script;
         NpcScriptManager.getInstance().start(chr.getClient(), npcId, script);
-//        EventManager.addEvent(() -> NpcScriptManager.getInstance().start(chr.getClient(), npcId, finalScript), 0);
     }
 
     public static void handleUserScriptMessageAnswer(InPacket in, MapleClient c) {
@@ -128,7 +118,7 @@ public class NpcHandler {
             case AskMenu:
                 int select;
                 if (action == 0) {
-                    select = -1;
+                    select = -1;//没有选择
                 } else {
                     select = in.readInt();
                 }

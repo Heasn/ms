@@ -11,6 +11,9 @@ public class QuestConstants {
     public static final String QUEST_COMPLETE_SCRIPT_END_TAG = "e";
 
     public static final int QUEST_POCKET = 6500;
+
+
+    public static final int QUEST_EX_STACK_CHAIRS = 7266;
     //锁定技能
     public static final int QUEST_EX_SKILL_STATE = 1544;
     //每日等级范围内怪物击杀数目统计
@@ -30,29 +33,34 @@ public class QuestConstants {
     public static final int QUEST_EX_SOUL_EFFECT = 26535;
     //怪物收藏数量
     public static final int QUEST_EX_COLLECTION_COUNT = 18821; //count=27
-    //超时空卷
-    public static final int QUEST_EX_MAP_TRANSFER_COUPON_FREE_MAX = 16700;
-    public static final int QUEST_EX_MAP_TRANSFER_COUPON_FREE_USED = 999991; //count=0;date=20210112
-    public static final int QUEST_EX_MAP_TRANSFER_COUPON_CASH_HAVE = 999992; //count=40
     //签到月份
-    public static final int SHARE_QUEST_EX_SIGNIN_MONTH = 6; //enter=202101
+    public static final int SHARE_QUEST_EX_DAILY_GIFT_MONTH = 6; //enter=202101
     //账号签到记录
-    public static final int SHARE_QUEST_EX_SIGNIN_LOG = 7; //count=0;day=0;date=20210108
+    public static final int SHARE_QUEST_EX_DAILY_GIFT_LOG = 7; //count=0;day=0;date=20210108
     //账号在线时间
     public static final int SHARE_QUEST_EX_ONLINE_TIME = 900100; //date=20210103;OnlineTime=138
     public static final int SHARE_QUEST_EX_LOGIN_IP = 1; //登陆IP=/59.53.44.112;初次登陆=1
     public static final int SHARE_QUEST_EX_LOGIN_TIP = 88818; //出生提示=1
     public static final int SHARE_QUEST_EX_USE_AUCTION = 81818; //使用拍卖=1
-
+    //核心碎片
+    public static final int QUEST_EX_MATRIX_SHARDS = 1477;
     //记忆魔方
     public static final int QUEST_EX_MEMORIAL_CUBE = 52889;
     //林志玲外观
     public static final int QUEST_EX_BEAST_TAMER_LOOK = 59300;
     //五转核心碎片
     public static final int QUEST_EX_5TH_CORE_CHIPS_COUNT = 1477;//count=20300
-
     public static final int QUEST_EX_GUILD = 26011; //GuildID=91 创建家族还是其他的?
-
     //npc商店组队积分
     public static final int QUEST_EX_NPC_SHOP_QUEST_ID_PQ_POINT = 7907;
+    //rank=404
+    public static final int SHARE_QUEST_EX_RANK = 18771;
+    //7=1;3=1;managerXpos=100;managerYpos=100
+    public static final int SHARE_QUEST_EX_MANAGER = 500767;
+
+    //V
+    public static final int QUEST_V = 1465;
+    //小屋：
+    public static final int SHARE_QUEST_EX_MY_HOME = 500763;//name=冒险岛真好玩'我的小屋
+
 }

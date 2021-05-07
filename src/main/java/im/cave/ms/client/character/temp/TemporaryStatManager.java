@@ -3,12 +3,15 @@ package im.cave.ms.client.character.temp;
 import im.cave.ms.client.character.MapleCharacter;
 import im.cave.ms.client.character.Option;
 import im.cave.ms.client.character.job.MapleJob;
+import im.cave.ms.client.field.AffectedArea;
 import im.cave.ms.connection.netty.OutPacket;
 import im.cave.ms.connection.packet.UserPacket;
 import im.cave.ms.connection.server.service.EventManager;
 import im.cave.ms.constants.GameConstants;
+import im.cave.ms.constants.ItemConstants;
 import im.cave.ms.constants.JobConstants;
 import im.cave.ms.enums.BaseStat;
+import im.cave.ms.enums.BodyPart;
 import im.cave.ms.enums.ChatType;
 import im.cave.ms.enums.TSIndex;
 import im.cave.ms.provider.data.SkillData;
@@ -19,26 +22,11 @@ import im.cave.ms.tools.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
 
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.CombatOrders;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.ComboCounter;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.ElementalCharge;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.IndieMaxDamageOver;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.IndieMaxDamageOverR;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.LifeTidal;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.RideVehicle;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.RideVehicleExpire;
-import static im.cave.ms.client.character.temp.CharacterTemporaryStat.Speed;
+import static im.cave.ms.client.character.temp.CharacterTemporaryStat.*;
 
 
 public class TemporaryStatManager {
@@ -58,7 +46,7 @@ public class TemporaryStatManager {
     //    private StopForceAtom stopForceAtom;
     private final MapleCharacter chr;
     private final List<TemporaryStatBase> twoStates = new ArrayList<>();
-    //    private final Set<AffectedArea> affectedAreas = new HashSet<>();
+    private final Set<AffectedArea> affectedAreas = new HashSet<>();
     private final Map<BaseStat, Integer> baseStats = new HashMap<>();
 
     public TemporaryStatManager(MapleCharacter chr) {
@@ -311,6 +299,11 @@ public class TemporaryStatManager {
                 out.writeInt(o.tOption);
             }
         }
+        if (hasNewStat(SoulMP)) {
+            out.writeInt(getOption(SoulMP).xOption);
+            out.writeInt(getOption(SoulMP).rOption);
+        }
+
         out.writeZeroBytes(9);
         if (hasNewStat(ElementalCharge)) {
             out.write(getOption(ElementalCharge).mOption);
@@ -318,18 +311,38 @@ public class TemporaryStatManager {
             out.write(getOption(ElementalCharge).uOption);
             out.write(getOption(ElementalCharge).zOption);
         }
-
+        if (hasNewStat(QuiverCartridge)) {
+            out.writeInt(getOption(QuiverCartridge).xOption);
+        }
         out.writeInt(0);
         if (hasNewStat(ComboCounter)) { //todo
             out.writeInt(getOption(ComboCounter).bOption);
         }
+
+        if (hasNewStat(KeyDownMoving)) {
+            out.writeInt(getOption(KeyDownMoving).tOption); //0
+        }
+
+        if (hasNewStat(ExtremeArchery)) {
+            out.writeInt(getOption(ExtremeArchery).bOption);
+            out.writeInt(getOption(ExtremeArchery).xOption);
+        }
+
         encodeIndieTempStat(out);
+        if (hasNewStat(SoulMP) || hasNewStat(FullSoulMP)) {
+            //暂时处理
+            out.writeZeroBytes(13);
+            getNewStats().clear();
+            return;
+        }
 
         out.write(1);
         out.write(1);
         out.write(1);
         out.writeInt(0);
-        out.write(0);  //sometimes
+        if (hasNewMovingEffectingStat()) {
+            out.write(0);
+        }
         getNewStats().clear();
     }
 
@@ -401,13 +414,15 @@ public class TemporaryStatManager {
         out.write(0); // KillingPoint
 
 
-        out.writeInt(0); // 神圣迅捷
         out.writeInt(0);
-        out.writeInt(0); // 战法灵气
+        out.writeInt(0);
+        out.writeInt(0);
+        //Level:short
+        //Skill:int
 
-        out.writeInt(0); // 激素狂飙
+        out.writeInt(0);
 
-        out.writeInt(0); // 忍耐之盾
+        out.writeInt(0);
 
         out.writeInt(0); // SECONDARY_STAT_UNK476
 
@@ -674,7 +689,7 @@ public class TemporaryStatManager {
         getRemovedStats().clear();
     }
 
-    public void removeAllDebuffs() {
+    public void removeAllDeBuffs() {
         removeStat(CharacterTemporaryStat.Stun, false);
         removeStat(CharacterTemporaryStat.Poison, false);
         removeStat(CharacterTemporaryStat.Seal, false);
@@ -687,25 +702,26 @@ public class TemporaryStatManager {
         sendResetStatPacket();
     }
 
-//    public Set<AffectedArea> getAffectedAreas() {
-//        return affectedAreas;
-//    }
+    public Set<AffectedArea> getAffectedAreas() {
+        return affectedAreas;
+    }
 
-//    public void addAffectedArea(AffectedArea aa) {
-//        getAffectedAreas().add(aa);
-//    }
-//
-//    public void removeAffectedArea(AffectedArea aa) {
-//        getAffectedAreas().remove(aa);
-//
-//        if (aa.getRemoveSkill()) {
-//            removeStatsBySkill(aa.getSkillID());
-//        }
-//    }
-//
-//    public boolean hasAffectedArea(AffectedArea affectedArea) {
-//        return getAffectedAreas().contains(affectedArea);
-//    }
+    public void addAffectedArea(AffectedArea aa) {
+        getAffectedAreas().add(aa);
+    }
+
+    public void removeAffectedArea(AffectedArea aa) {
+        getAffectedAreas().remove(aa);
+
+        if (aa.getRemoveSkill()) {
+            removeStatsBySkill(aa.getSkillID());
+        }
+    }
+
+    //
+    public boolean hasAffectedArea(AffectedArea affectedArea) {
+        return getAffectedAreas().contains(affectedArea);
+    }
 
     public boolean hasStatBySkillId(int skillId) {
         for (CharacterTemporaryStat cts : getCurrentStats().keySet()) {
@@ -742,23 +758,22 @@ public class TemporaryStatManager {
     }
 
     public void addSoulMPFromMobDeath() {
-//        if (hasStat(SoulMP)) {
-//            Option o = getOption(SoulMP);
-//            o.nOption = Math.min(ItemConstants.MAX_SOUL_CAPACITY, o.nOption + ItemConstants.MOB_DEATH_SOUL_MP_COUNT);
-//            putCharacterStatValue(SoulMP, o);
-//            if (o.nOption >= ItemConstants.MAX_SOUL_CAPACITY && !hasStat(FullSoulMP)) {
-//                Option o2 = new Option();
-//                o2.rOption = ItemConstants.getSoulSkillFromSoulID(((Equip) chr.getEquippedItemByBodyPart(BodyPart.Weapon)).getSoulOptionId());
-//                if (o2.rOption == 0) {
-//                    chr.chatMessage(String.format("Unknown corresponding skill for soul socket id %d!",
-//                            ((Equip) chr.getEquippedItemByBodyPart(BodyPart.Weapon)).getSoulOptionId()));
-//                }
-//                o2.nOption = ItemConstants.MAX_SOUL_CAPACITY;
-//                o2.xOption = ItemConstants.MAX_SOUL_CAPACITY;
-//                putCharacterStatValue(FullSoulMP, o2);
-//            }
-//            sendSetStatPacket();
-//        }
+        if (hasStat(SoulMP)) {
+            Option o = getOption(SoulMP);
+            o.nOption = Math.min(ItemConstants.MAX_SOUL_CAPACITY, o.nOption + ItemConstants.MOB_DEATH_SOUL_MP_COUNT);
+            putCharacterStatValue(SoulMP, o);
+            if (o.nOption >= ItemConstants.SOUL_SKILL_PREPARED && !hasStat(FullSoulMP)) {
+                Option o2 = new Option();
+                o2.rOption = ItemConstants.getSoulSkillFromSoulID(chr.getEquippedEquip(BodyPart.Weapon).getSoulOptionId());
+                if (o2.rOption == 0) {
+                    chr.chatMessage(String.format("Unknown corresponding skill for soul socket id %d!",
+                            chr.getEquippedEquip(BodyPart.Weapon).getSoulOptionId()));
+                }
+                o2.tOption = 640000;
+                putCharacterStatValue(FullSoulMP, o2);
+            }
+            sendSetStatPacket();
+        }
     }
 
     public void putCharacterStatValueFromMobSkill(CharacterTemporaryStat cts, Option o) {

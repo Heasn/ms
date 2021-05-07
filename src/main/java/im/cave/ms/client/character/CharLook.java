@@ -2,29 +2,15 @@ package im.cave.ms.client.character;
 
 import im.cave.ms.client.character.items.Inventory;
 import im.cave.ms.client.character.items.Item;
-import im.cave.ms.client.field.obj.Pet;
 import im.cave.ms.connection.netty.OutPacket;
 import im.cave.ms.constants.GameConstants;
 import im.cave.ms.constants.JobConstants;
 import im.cave.ms.enums.BodyPart;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
-import javax.persistence.PostLoad;
-import javax.persistence.Table;
-import javax.persistence.Transient;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import javax.persistence.*;
+import java.util.*;
 
 /**
  * @author fair
@@ -43,7 +29,7 @@ public class CharLook {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "charId")
     private MapleCharacter chr;
-    private byte gender;
+    private byte gender; //0:Male 1:Female
     private byte skin;
     private int hair;
     private int face;
@@ -51,7 +37,7 @@ public class CharLook {
     private byte hairColorBase;
     private byte hairColorMixed;
     private byte hairColorProb;
-    private boolean zero;
+    private boolean zero; //isZero
     private int ears;
     private int tail;
     @Transient
@@ -127,29 +113,36 @@ public class CharLook {
         out.writeInt(getJob());
         out.writeBool(isMega());
         out.writeInt(getHair());
+        //显示的装备
         getHairEquips().forEach((pos, itemId) -> {
             out.write(pos);
             out.writeInt(itemId);
         });
         out.write(-1);
+        //被遮挡的装备
         getUnseenEquips().forEach((pos, itemId) -> {
             out.write(pos);
             out.writeInt(itemId);
         });
         out.write(-1);
-        //todo arcane
+        //未知
         out.write(-1);
+
+        //图腾开始
         getTotems().forEach((pos, itemId) -> {
             out.write(pos - BodyPart.TotemBase.getVal());
             out.writeInt(itemId);
         });
         out.write(-1);
+
         out.writeInt(getWeaponStickerId());
         out.writeInt(getWeaponId());
         out.writeInt(getSubWeaponId());
 
         out.writeLong(0);
-        out.write(0); // 0或1
+        out.write(0); //boolean
+
+        //三个宠物的ID
         for (int i = 0; i < GameConstants.MAX_PET_AMOUNT; i++) {
             if (chr.getPets().size() > i) {
                 out.writeInt(chr.getPets().get(i).getTemplateId());
@@ -159,8 +152,10 @@ public class CharLook {
         }
 
         if (JobConstants.isXenon((short) getJob()) || JobConstants.isDemon((short) getJob())) {
+            //虎影：胡须
             out.writeInt(getMark());
         }
         out.writeZeroBytes(7);
+        out.writeInt(0);
     }
 }

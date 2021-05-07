@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 /**
  * @author fair
  * @version V1.0
- * @Package im.cave.ms.network.server.channel.handler
+ * @Package im.cave.ms.network.server.channelId.handler
  * @date 1/1 22:08
  */
 public class PetHandler {
@@ -167,7 +167,7 @@ public class PetHandler {
         player.announce(PetPacket.cashPetPickUpOnOffResult(true, on));
     }
 
-    public static void handlePetSetExceptionList(InPacket in, MapleClient c) {
+    public static void handlePetUpdateExceptionList(InPacket in, MapleClient c) {
         MapleCharacter player = c.getPlayer();
         int idx = in.readInt();
         Pet pet = player.getPetByIdx(idx);

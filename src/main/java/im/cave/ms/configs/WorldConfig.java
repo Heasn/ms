@@ -1,6 +1,6 @@
 package im.cave.ms.configs;
 
-import im.cave.ms.client.MapleSignIn;
+import im.cave.ms.client.MapleDailyGift;
 
 import java.util.List;
 
@@ -13,14 +13,14 @@ import java.util.List;
 public class WorldConfig {
 
     public List<WorldInfo> worlds;
-    public List<MapleSignIn.SignInRewardInfo> signin;
+    public List<MapleDailyGift.CheckInRewardInfo> dailyGifts;
 
     public WorldInfo getWorldInfo(int worldId) {
         return worlds.stream().filter(world -> world.id == worldId).findAny().orElse(null);
     }
 
-    public List<MapleSignIn.SignInRewardInfo> getSignInRewards() {
-        return signin;
+    public List<MapleDailyGift.CheckInRewardInfo> getDailyGiftsRewards() {
+        return dailyGifts;
     }
 
     public static class WorldInfo {
@@ -32,9 +32,5 @@ public class WorldConfig {
         public int exp_rate = 1;
         public int meso_rate = 1;
         public int drop_rate = 1;
-        public int boss_drop_rate = 1;
-        public int quest_rate = 1;
-        public int travel_rate = 1;
-        public int fishing_rate = 1;
     }
 }
